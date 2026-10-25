@@ -104,6 +104,7 @@ echo [OK] Frontend ready
 echo.
 
 REM ============================================================
+<<<<<<< HEAD
 REM START SERVICES (SINGLE TERMINAL MODE)
 REM ============================================================
 
@@ -114,3 +115,30 @@ if errorlevel 1 (
     echo Application stopped.
     pause
 )
+=======
+REM START SERVICES
+REM ============================================================
+
+echo Starting backend...
+start "Backend" cmd /k "cd /d %~dp0backend && ..\venv\Scripts\activate.bat && python -m uvicorn main:app --reload --port 8000"
+
+timeout /t 3 /nobreak >nul
+
+echo Starting frontend...
+start "Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
+
+timeout /t 2 /nobreak >nul
+
+start http://localhost:5173
+
+echo.
+echo ============================================================
+echo   Literate Lamp Running
+echo ============================================================
+echo.
+echo Backend  : http://localhost:8000
+echo Frontend : http://localhost:5173
+echo.
+
+pause
+>>>>>>> 2731da004173e056ade5ccaf2f53ebf590c41c48

@@ -22,7 +22,7 @@ if ! command -v python3 &> /dev/null; then
     clear
     echo -e "${RED}"
     echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                    ❌ ERROR                                 ║"
+    echo "║                     ERROR                                 ║"
     echo "║              Python 3 NOT FOUND on System                 ║"
     echo "╚════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -49,7 +49,7 @@ else
     python3 -m venv venv
     
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ Failed to create virtual environment${NC}"
+        echo -e "${RED} Failed to create virtual environment${NC}"
         exit 1
     fi
     
@@ -71,7 +71,7 @@ echo -e "${YELLOW}⏳ Installing Python dependencies from backend/requirements.t
 pip install -r backend/requirements.txt
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ Failed to install Python dependencies${NC}"
+    echo -e "${RED} Failed to install Python dependencies${NC}"
     exit 1
 fi
 
@@ -83,7 +83,7 @@ if ! command -v node &> /dev/null; then
     clear
     echo -e "${YELLOW}"
     echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                    ⚠️  WARNING                              ║"
+    echo "║                      WARNING                              ║"
     echo "║              Node.js NOT FOUND on System                  ║"
     echo "╚════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -108,7 +108,7 @@ if [ ! -d "node_modules" ]; then
     npm install
     
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ Failed to install frontend dependencies${NC}"
+        echo -e "${RED} Failed to install frontend dependencies${NC}"
         cd ..
         exit 1
     fi

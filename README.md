@@ -1,14 +1,13 @@
-# Shutterstock AI Metadata Generator
 
-Auto-generate Shutterstock metadata (description, keywords, categories) using Google Gemini AI.
+Auto-generate metadata (description, keywords, categories) using Google Gemini AI.
 
 ## Features
-- 🖼️ Image & video support
-- 🤖 Multiple Gemini models (2.5 Pro, 2.5 Flash, 2.5 Flash Lite, 2.0 Flash, 2.0 Flash Lite)
-- 🔑 Multi API key with auto-rolling on rate limit
-- ⏯️ Start / Pause / Stop queue controls
-- 📋 Export CSV for Shutterstock bulk upload
-- 🎬 FFmpeg-based video frame extraction
+- Image & video support
+- Multiple Gemini models (2.5 Pro, 2.5 Flash, 2.5 Flash Lite, 2.0 Flash, 2.0 Flash Lite)
+- Multi API key with auto-rolling on rate limit
+- Start / Pause / Stop queue controls
+- Export CSV for bulk upload
+- FFmpeg-based video frame extraction
 
 ---
 
@@ -39,28 +38,34 @@ sudo apt install ffmpeg
 ---
 
 ## Setup & Run
+1. Run setup-python
+2. Run start
+   
+### 1. Python
 
-### 1. Backend
-
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+**Windows:**
+```
+setup-python.bat
 ```
 
-Backend runs at: http://localhost:8000
+**Ubuntu/Debian:**
+```
+setup-python.sh
+```
 
-### 2. Frontend (new terminal)
+### 2. Start
 
-```bash
-cd frontend
-npm install
-npm run dev
+**Windows:**
+```
+start.bat
+```
+**Ubuntu/Debian:**
+```
+start.sh
 ```
 
 Frontend runs at: http://localhost:5173
-
----
+Backend runs at: http://localhost:8000
 
 ## Usage
 
@@ -70,7 +75,8 @@ Frontend runs at: http://localhost:5173
 4. Drag & drop images/videos onto the drop zone
 5. Click **START** to begin analysis
 6. Edit description/keywords/categories if needed
-7. Click **EXPORT CSV** to download for Shutterstock
+7. Click **EXPORT CSV** to download
+8. When there are any errors of shutterstock csv, just select none at shutterstock categories 
 
 ---
 
@@ -81,33 +87,6 @@ When a key hits rate limit (429), the backend automatically:
 2. Switches to the next available key
 3. Auto-resets the key after ~65 seconds
 4. Shows live key status in the UI (green/yellow/red)
-
----
-
-## Project Structure
-
-```
-shutterstock-ai/
-├── backend/
-│   ├── main.py              # FastAPI app + routes
-│   ├── gemini_service.py    # Gemini API + key rolling
-│   ├── video_service.py     # FFmpeg frame extraction
-│   ├── queue_manager.py     # Job queue with start/pause/stop
-│   ├── config.py            # Models + categories config
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── api/index.js     # Axios API calls
-│   │   └── components/
-│   │       ├── ApiKeyManager.jsx
-│   │       ├── ModelSelector.jsx
-│   │       ├── QueueControls.jsx
-│   │       └── FileRow.jsx
-│   ├── package.json
-│   └── vite.config.js
-└── README.md
-```
 
 ---
 

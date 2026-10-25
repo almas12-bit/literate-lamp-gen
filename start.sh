@@ -1,115 +1,177 @@
-name=start.sh url=https://github.com/almasikhwanstock-star/literate-lamp/blob/main/start.sh
 #!/bin/bash
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
 
 clear
 
-echo -e "${BLUE}"
-echo "════════════════════════════════════════════════════════════"
+echo ""
+echo "============================================================"
 echo "  Literate Lamp - Starting Application"
-echo "════════════════════════════════════════════════════════════"
-echo -e "${NC}"
-echo
+echo "============================================================"
+echo ""
 
-# Check if venv exists
+# ============================================================
+# GO TO SCRIPT DIRECTORY
+# ============================================================
+
+cd "$(dirname "$0")"
+
+# ============================================================
+# CHECK PYTHON VENV
+# ============================================================
+
 if [ ! -d "venv" ]; then
-    echo -e "${RED}❌ ERROR: Virtual environment not found!${NC}"
-    echo
-    echo "Please run './setup-python.sh' first to setup dependencies."
-    echo
+    echo "ERROR: Virtual environment not found!"
+    echo ""
+    echo "Run setup-python.sh first."
+    echo ""
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
 # Activate venv
 source venv/bin/activate
 
-# Check if .env exists
+if [ $? -ne 0 ]; then
+    echo "Failed to activate virtual environment"
+    echo ""
+    read -p "Press Enter to continue..."
+    exit 1
+fi
+
+echo "[OK] Python environment ready"
+echo ""
+
+# ============================================================
+# CREATE .ENV IF NOT EXISTS
+# ============================================================
+
 if [ ! -f ".env" ]; then
-    echo -e "${YELLOW}⚠️  WARNING: .env file not found!${NC}"
-    echo
-    echo "1. Copy .env.example to .env"
-    echo "2. Edit .env and add your API keys"
-    echo
+
+    echo "Creating .env..."
+
+    cat > .env << EOF
+# Auto generated
+# Managed by GUI
+EOF
+
+    echo "[OK] .env created"
+    echo ""
+fi
+
+# ============================================================
+# CHECK NODE.JS
+# ============================================================
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "ERROR: Node.js not installed"
+    echo ""
+    echo "Install Node.js:"
+    echo "https://nodejs.org/"
+    echo ""
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
-echo -e "${GREEN}✓ Virtual environment activated${NC}"
-echo
+echo "[OK] Node.js detected"
+echo ""
 
-# Check Node.js
-if ! command -v node &> /dev/null; then
-    echo -e "${RED}❌ ERROR: Node.js not found!${NC}"
-    echo "Download: https://nodejs.org/"
+# ============================================================
+# CHECK FRONTEND
+# ============================================================
+
+if [ ! -d "frontend" ]; then
+    echo "ERROR: frontend folder not found"
+    echo ""
+    read -p "Press Enter to continue..."
     exit 1
 fi
 
-echo -e "${GREEN}✓ Backend environment ready${NC}"
-echo -e "${GREEN}✓ Frontend environment ready${NC}"
-echo
-
-# Install frontend dependencies if needed
 cd frontend
+
+# ============================================================
+# INSTALL FRONTEND DEPENDENCIES
+# ============================================================
+
 if [ ! -d "node_modules" ]; then
-    echo -e "${YELLOW}⏳ Installing frontend dependencies...${NC}"
-    npm install --silent
-    
+
+    echo "Installing frontend dependencies..."
+    echo ""
+
+    npm install
+
     if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ Failed to install frontend dependencies${NC}"
+        echo ""
+        echo "Failed to install frontend dependencies"
         cd ..
+        read -p "Press Enter to continue..."
         exit 1
     fi
 fi
+
 cd ..
 
-echo -e "${GREEN}✓ All systems ready!${NC}"
-echo
+echo "[OK] Frontend ready"
+echo ""
 
-clear
-echo -e "${BLUE}"
-echo "════════════════════════════════════════════════════════════"
-echo "  ✓ STARTING SERVICES"
-echo "════════════════════════════════════════════════════════════"
-echo -e "${NC}"
-echo
-echo -e "📡 Backend:  ${BLUE}http://localhost:8000${NC}"
-echo -e "🎨 Frontend: ${BLUE}http://localhost:5173${NC}"
-echo
-echo "Press Ctrl+C to stop all services"
-echo
+# ============================================================
+# START BACKEND
+# ============================================================
 
-# Start backend in background
-echo -e "${YELLOW}⏳ Starting backend...${NC}"
-(cd backend && python -m uvicorn main:app --reload --port 8000) &
-BACKEND_PID=$!
+echo "Starting backend..."
 
-# Wait for backend to start
+gnome-terminal -- bash -c "
+cd backend
+source ../venv/bin/activate
+python -m uvicorn main:app --reload --port 8000
+exec bash
+" 2>/dev/null &
+
+# fallback kalau gnome-terminal tidak ada
+if [ $? -ne 0 ]; then
+    xterm -e "
+cd backend
+source ../venv/bin/activate
+python -m uvicorn main:app --reload --port 8000
+bash
+" &
+fi
+
+sleep 3
+
+# ============================================================
+# START FRONTEND
+# ============================================================
+
+echo "Starting frontend..."
+
+gnome-terminal -- bash -c "
+cd frontend
+npm run dev
+exec bash
+" 2>/dev/null &
+
+if [ $? -ne 0 ]; then
+    xterm -e "
+cd frontend
+npm run dev
+bash
+" &
+fi
+
 sleep 2
 
-# Start frontend in background
-echo -e "${YELLOW}⏳ Starting frontend...${NC}"
-(cd frontend && npm run dev) &
-FRONTEND_PID=$!
+# ============================================================
+# OPEN BROWSER
+# ============================================================
 
-echo -e "${GREEN}✓ Both services started!${NC}"
-echo
+xdg-open http://localhost:5173 >/dev/null 2>&1 &
 
-# Function to cleanup on exit
-cleanup() {
-    echo
-    echo -e "${YELLOW}Shutting down services...${NC}"
-    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
-    echo -e "${GREEN}✓ Services stopped${NC}"
-    exit 0
-}
+echo ""
+echo "============================================================"
+echo "  Literate Lamp Running"
+echo "============================================================"
+echo ""
+echo "Backend  : http://localhost:8000"
+echo "Frontend : http://localhost:5173"
+echo ""
 
-# Trap Ctrl+C
-trap cleanup INT
-
-# Wait for processes
-wait
+read -p "Press Enter to exit..."
