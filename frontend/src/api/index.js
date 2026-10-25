@@ -9,6 +9,8 @@ export const getKeysStatus   = ()      => api.get('/keys/status');
 export const setModel        = (m)     => api.post('/model', { model: m });
 export const setPlatforms    = (p)     => api.post('/platforms', { platforms: p });
 export const setKeywordCount = (c)     => api.post('/keyword-count', { count: c });
+export const getRules        = ()      => api.get('/rules');
+export const setRules        = (r)     => api.post('/rules', r);
 export const uploadFiles     = (fd)    => api.post('/upload', fd);
 export const getQueueStatus  = ()      => api.get('/queue/status');
 export const getQueueJobs    = ()      => api.get('/queue/jobs');

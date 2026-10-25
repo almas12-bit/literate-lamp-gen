@@ -47,14 +47,21 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
     return null;
   }, [job.fileObj, isVideo]);
 
-  // Cleanup object URL when component unmounts or fileObj changes
+  // Create stable image URL using useMemo to prevent memory leak and flickering on every render
+  const imageUrl = useMemo(() => {
+    if (!isVideo && job.fileObj) {
+      return URL.createObjectURL(job.fileObj);
+    }
+    return null;
+  }, [job.fileObj, isVideo]);
+
+  // Cleanup object URLs when component unmounts or fileObj changes
   useEffect(() => {
     return () => {
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
     };
-  }, [videoUrl]);
+  }, [videoUrl, imageUrl]);
 
   const patch = async (field, value) => {
     onChange(job.id, field, value);
@@ -70,21 +77,28 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
     try { await retryFailed([job.id]); onChange(job.id, 'status', 'pending'); onChange(job.id, 'error', ''); } catch {}
   };
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
+  const backendBase = 'http://localhost:8000';
+  const effectiveVideoUrl = videoUrl || (isVideo && job.media_url ? `${backendBase}${job.media_url}` : null);
+  const effectiveImageUrl = imageUrl || (!isVideo && job.media_url ? `${backendBase}${job.media_url}` : null);
+
+  const togglePlay = (e) => {
+    if (e) e.stopPropagation();
+    if (!videoRef.current || !effectiveVideoUrl) return;
     
     if (playing) { 
       videoRef.current.pause(); 
       setPlaying(false); 
     } else { 
-      // Add promise handling for modern browsers
+      videoRef.current.muted = true;
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => setPlaying(true))
-          .catch(err => console.error('Play failed:', err));
+          .catch(err => {
+            console.error('Play failed:', err);
+            setPlaying(false);
+          });
       } else {
-        // Fallback for older browsers
         setPlaying(true);
       }
     }
@@ -143,27 +157,34 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
           <div style={{ width:68, height:68, borderRadius:'var(--radius)', overflow:'hidden', background:'var(--bg-surface-3)', position:'relative', flexShrink:0, border:'1px solid var(--border)' }}>
             {isVideo ? (
               <>
-                {videoUrl && (
-                  <video 
-                    ref={videoRef} 
-                    src={videoUrl}
-                    style={{ width:'100%', height:'100%', objectFit:'cover', display: 'block' }}
-                    onEnded={() => setPlaying(false)} 
-                    loop={false} 
-                    muted={false}
-                  />
+                {effectiveVideoUrl ? (
+                  <>
+                    <video 
+                      ref={videoRef} 
+                      src={effectiveVideoUrl}
+                      preload="metadata"
+                      playsInline
+                      style={{ width:'100%', height:'100%', objectFit:'cover', display: 'block' }}
+                      onEnded={() => setPlaying(false)} 
+                      onPause={() => setPlaying(false)}
+                      onPlay={() => setPlaying(true)}
+                      loop={false} 
+                      muted
+                    />
+                    <div onClick={togglePlay} style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:'rgba(0,0,0,0.25)' }}>
+                      <div style={{ width:22, height:22, background:'rgba(0,0,0,0.55)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        {playing ? <Pause size={10} color="white"/> : <Play size={10} color="white"/>}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div title="Preview tidak tersedia" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🎬</div>
                 )}
-                {!videoUrl && <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🎬</div>}
-                <div onClick={togglePlay} style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', background:'rgba(0,0,0,0.25)' }}>
-                  <div style={{ width:22, height:22, background:'rgba(0,0,0,0.55)', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    {playing ? <Pause size={10} color="white"/> : <Play size={10} color="white"/>}
-                  </div>
-                </div>
               </>
-            ) : job.fileObj ? (
-              <img src={URL.createObjectURL(job.fileObj)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+            ) : effectiveImageUrl ? (
+              <img src={effectiveImageUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
             ) : (
-              <div style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🖼️</div>
+              <div title="Preview tidak tersedia" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🖼️</div>
             )}
           </div>
         </div>

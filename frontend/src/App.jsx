@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Sparkles, Download, UploadCloud, Sun, Moon, Wifi, WifiOff, ServerCrash, ChevronDown } from 'lucide-react';
+import { Gem, Download, UploadCloud, Sun, Moon, Wifi, WifiOff, ServerCrash, ChevronDown } from 'lucide-react';
 import {
   healthCheck, getModels, getKeysStatus, uploadFiles,
   getQueueStatus, getQueueJobs, startQueue, pauseQueue,
@@ -9,6 +9,7 @@ import ApiKeyManager    from './components/ApiKeyManager';
 import ModelSelector    from './components/ModelSelector';
 import PlatformSelector from './components/PlatformSelector';
 import KeywordCount     from './components/KeywordCount';
+import PromptRules      from './components/PromptRules';
 import QueueControls    from './components/QueueControls';
 import FilterBar        from './components/FilterBar';
 import FileRow          from './components/FileRow';
@@ -38,6 +39,7 @@ export default function App() {
   const [selected, setSelected]         = useState([]);
   const [showExport, setShowExport]     = useState(false);
   const [exportPlatforms, setExportPlatforms] = useState(['shutterstock','adobe_stock']);
+  const [rules, setRulesState]          = useState(null);
   const pollRef = useRef(null);
   const exportRef = useRef(null);
 
@@ -75,6 +77,7 @@ export default function App() {
         setCurrentModel(h.data.model || 'gemini-2.5-flash');
         setPlatforms(h.data.platforms || ['shutterstock']);
         setKwCount(h.data.keyword_count || 45);
+        if (h.data.rules) setRulesState(h.data.rules);
       } catch { setBackendOk(false); }
     })();
     getModels().then(r => setModels(r.data.models)).catch(() => {});
@@ -150,13 +153,30 @@ export default function App() {
     const donJobs = jobs.filter(j => j.status === 'done');
     if (!donJobs.length) return;
 
+    const sanitizeTitleExport = (t) => {
+      let str = (t || '').trim();
+      if (str.length > 200) {
+        str = str.substring(0, 200);
+        const lastSpace = str.lastIndexOf(' ');
+        if (lastSpace > 50) str = str.substring(0, lastSpace);
+        str = str.replace(/[,;:\-\s]+$/, '');
+      }
+      return str;
+    };
+
+    const sanitizeKeywordsExport = (kw) => {
+      if (!kw) return '';
+      const list = kw.split(',').map(k => k.trim()).filter(Boolean);
+      return list.slice(0, 49).join(', ');
+    };
+
     let csv = '';
     if (platform === 'shutterstock') {
       const headers = ['Filename','Description','Keywords','Categories','Editorial','Mature content','illustration'];
       const esc = s => `"${(s||'').replace(/"/g,'""')}"`;
       const rows = donJobs.map(j => {
         const cats = [j.ss_category1, j.ss_category2].filter(Boolean).join(', ');
-        return [j.filename, esc(j.title), esc(j.keywords), esc(cats), j.editorial, j.mature_content, j.illustration].join(',');
+        return [j.filename, esc(sanitizeTitleExport(j.title)), esc(sanitizeKeywordsExport(j.keywords)), esc(cats), j.editorial, j.mature_content, j.illustration].join(',');
       });
       csv = [headers.join(','), ...rows].join('\n');
       download(csv, 'shutterstock_metadata.csv');
@@ -165,7 +185,7 @@ export default function App() {
       const esc = s => `"${(s||'').replace(/"/g,'""')}"`;
       const rows = donJobs.map(j => {
         const cat = j.as_category1 && j.as_category1 !== '0' ? j.as_category1 : '';
-        return [j.filename, esc(j.title), esc(j.keywords), cat, esc(j.releases||'')].join(',');
+        return [j.filename, esc(sanitizeTitleExport(j.title)), esc(sanitizeKeywordsExport(j.keywords)), cat, esc(j.releases||'')].join(',');
       });
       csv = [headers.join(','), ...rows].join('\n');
       download(csv, 'adobe_stock_metadata.csv');
@@ -198,11 +218,11 @@ export default function App() {
         {/* Logo */}
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:30, height:30, background:'var(--accent)', borderRadius:'var(--radius)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Sparkles size={16} color="white"/>
+            <Gem size={16} color="white"/>
           </div>
           <div>
             <div style={{ fontSize:14, fontWeight:700, letterSpacing:'-0.3px', lineHeight:1.2 }}>
-              Shutterstock<span style={{ color:'var(--accent)' }}>_AI</span>
+              Litterate<span style={{ color:'var(--accent)' }}> Lamp</span>
             </div>
             <div style={{ fontSize:10, color:'var(--text-tertiary)', textTransform:'uppercase', letterSpacing:'0.05em', lineHeight:1.2 }}>Metadata Generator</div>
           </div>
@@ -293,6 +313,9 @@ export default function App() {
           <PlatformSelector active={platforms} onChange={setPlatforms} />
           <KeywordCount value={kwCount} onChange={setKwCount} />
         </div>
+
+        {/* Custom Metadata & Keyword Rules Form */}
+        <PromptRules initialRules={rules} onRulesUpdated={setRulesState} />
 
         {/* Queue controls */}
         <QueueControls

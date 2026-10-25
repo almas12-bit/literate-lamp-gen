@@ -1,93 +1,116 @@
-name=start.bat url=https://github.com/almasikhwanstock-star/literate-lamp/blob/main/start.bat
 @echo off
 chcp 65001 >nul
-setlocal enabledelayedexpansion
+setlocal
+
+cd /d "%~dp0"
+
+title Literate Lamp Launcher
 
 cls
 echo.
-echo ════════════════════════════════════════════════════════════
+echo ============================================================
 echo   Literate Lamp - Starting Application
-echo ════════════════════════════════════════════════════════════
+echo ============================================================
 echo.
 
-REM Check if venv exists
+REM ============================================================
+REM CHECK VENV
+REM ============================================================
+
 if not exist "venv" (
-    echo ❌ ERROR: Virtual environment not found!
-    echo.
-    echo Please run 'setup-python.bat' first to setup dependencies.
+    echo ERROR: venv not found
+    echo Run setup-python.bat first
     echo.
     pause
     exit /b 1
 )
 
-REM Activate venv
 call venv\Scripts\activate.bat
 
-REM Check if .env exists
+if errorlevel 1 (
+    echo Failed to activate venv
+    pause
+    exit /b 1
+)
+
+echo [OK] Python environment ready
+echo.
+
+REM ============================================================
+REM CREATE .ENV IF NOT EXISTS
+REM ============================================================
+
 if not exist ".env" (
-    echo ⚠️  WARNING: .env file not found!
+
+    echo Creating .env...
+
+    (
+        echo # Auto generated
+        echo # Managed by GUI
+    ) > .env
+
+    echo [OK] .env created
     echo.
-    echo 1. Copy .env.example to .env
-    echo 2. Edit .env and add your API keys
-    echo.
-    pause
-    exit /b 1
 )
 
-echo ✓ Virtual environment activated
-echo.
+REM ============================================================
+REM CHECK NODE
+REM ============================================================
 
-REM Check Node.js
-node --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ❌ ERROR: Node.js not found!
+node -v >nul 2>&1
+
+if errorlevel 1 (
+    echo ERROR: Node.js not installed
     echo Download: https://nodejs.org/
+    echo.
     pause
     exit /b 1
 )
 
-echo ✓ Backend environment ready
-echo ✓ Frontend environment ready
+echo [OK] Node.js detected
 echo.
 
-REM Install frontend dependencies if needed
+REM ============================================================
+REM INSTALL FRONTEND DEPENDENCIES
+REM ============================================================
+
+if not exist "frontend" (
+    echo ERROR: frontend folder missing
+    pause
+    exit /b 1
+)
+
 cd frontend
+
 if not exist "node_modules" (
-    echo ⏳ Installing frontend dependencies...
-    call npm install --silent
-    if %errorlevel% neq 0 (
-        echo ❌ Failed to install frontend dependencies
+
+    echo Installing frontend dependencies...
+    echo.
+
+    call npm install
+
+    if errorlevel 1 (
+        echo.
+        echo Failed to install frontend dependencies
         cd ..
         pause
         exit /b 1
     )
 )
+
 cd ..
 
-echo ✓ All systems ready!
+echo [OK] Frontend ready
 echo.
 
-cls
-echo.
-echo ════════════════════════════════════════════════════════════
-echo   ✓ STARTING SERVICES
-echo ════════════════════════════════════════════════════════════
-echo.
-echo 📡 Backend:  http://localhost:8000
-echo 🎨 Frontend: http://localhost:5173
-echo.
-echo Press Ctrl+C in this window to stop all services
-echo.
+REM ============================================================
+REM START SERVICES (SINGLE TERMINAL MODE)
+REM ============================================================
 
-REM Start backend in new window
-start "Literate Lamp - Backend" cmd /k "venv\Scripts\activate.bat && cd backend && python -m uvicorn main:app --reload --port 8000"
+python launcher.py
 
-REM Wait for backend to start
-timeout /t 2 /nobreak
-
-REM Start frontend in new window
-start "Literate Lamp - Frontend" cmd /k "cd frontend && npm run dev"
-
-echo ✓ Both services started!
-echo.
-pause
+if errorlevel 1 (
+    echo.
+    echo Application stopped.
+    pause
+)
