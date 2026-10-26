@@ -1,230 +1,268 @@
 @echo off
-chcp 65001 >nul
+chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
-title Literate Lamp - Environment Setup
+title Literate Lamp - Setup Lingkungan & Python
 
 cls
 echo.
 echo ============================================================
-echo   Literate Lamp - Full Environment and Prerequisites Setup
+echo   Literate Lamp - Setup Lingkungan dan Dependensi Otomatis
 echo ============================================================
 echo.
 
 REM ------------------------------------------------------------
-REM 0. CHECK WINDOWS PACKAGE MANAGER [WINGET]
+REM 0. PREPEND STANDARD SYSTEM DIRECTORIES TO PATH
 REM ------------------------------------------------------------
+if exist "%ProgramFiles%\nodejs" (
+    set "PATH=%ProgramFiles%\nodejs;!PATH!"
+)
+if exist "%ProgramFiles(x86)%\nodejs" (
+    set "PATH=%ProgramFiles(x86)%\nodejs;!PATH!"
+)
+if exist "%LOCALAPPDATA%\Programs\nodejs" (
+    set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
+)
+
 set "HAS_WINGET=0"
 where winget >nul 2>&1
 if !errorlevel! equ 0 (
     set "HAS_WINGET=1"
-    echo [OK] Windows Package Manager [winget] detected.
+    echo [OK] Windows Package Manager [winget] terdeteksi.
 ) else (
-    echo [!] winget not found. Auto-installer will fallback to manual links.
+    echo [i] winget tidak ditemukan. Sistem akan menggunakan pengecekan direktori standar.
 )
 echo.
 
 REM ------------------------------------------------------------
-REM 1. CHECK AND AUTO-INSTALL PYTHON
+REM 1. CHECK AND DETECT PYTHON
 REM ------------------------------------------------------------
-echo Checking Python...
+echo [1/6] Memeriksa Python...
 set "PYTHON_EXEC="
 
-REM Test if 'python' works and is not the Microsoft Store dummy shortcut
+REM Uji perintah 'python' bawaan PATH (pastikan bukan dummy Microsoft Store)
 python -c "import sys" >nul 2>&1
 if !errorlevel! equ 0 (
     set "PYTHON_EXEC=python"
-) else (
-    REM Check Python Launcher 'py'
-    py -3 -c "import sys" >nul 2>&1
-    if !errorlevel! equ 0 (
-        set "PYTHON_EXEC=py -3"
-    ) else (
-        REM Search standard install directories if PATH was not set
-        for %%d in (
-            "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
-            "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-            "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-            "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
-            "%ProgramFiles%\Python313\python.exe"
-            "%ProgramFiles%\Python312\python.exe"
-            "%ProgramFiles%\Python311\python.exe"
-            "C:\Python314\python.exe"
-            "C:\Python313\python.exe"
-            "C:\Python312\python.exe"
-            "C:\Python311\python.exe"
-        ) do (
-            if not defined PYTHON_EXEC (
-                if exist %%d (
-                    %%d -c "import sys" >nul 2>&1
-                    if !errorlevel! equ 0 (
-                        set "PYTHON_EXEC=%%~d"
-                    )
-                )
-            )
-        )
-    )
+    goto :python_detected
 )
 
-if not defined PYTHON_EXEC (
-    echo [!] Python is NOT installed (or only Microsoft Store dummy shortcut was found).
-    if "!HAS_WINGET!"=="1" (
-        echo [!] Auto-installing Python 3.12 via winget...
-        echo     Please click Yes if Windows UAC asks for permission.
-        winget install Python.Python.3.12 --override "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" --accept-package-agreements --accept-source-agreements
-        call :refresh_path
-        
-        REM Test again after winget install
-        python -c "import sys" >nul 2>&1
+REM Uji Python Launcher 'py'
+py -3 -c "import sys" >nul 2>&1
+if !errorlevel! equ 0 (
+    set "PYTHON_EXEC=py -3"
+    goto :python_detected
+)
+
+REM Uji lokasi instalasi standar Python di Windows
+for %%p in (
+    "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+    "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+    "%ProgramFiles%\Python313\python.exe"
+    "%ProgramFiles%\Python312\python.exe"
+    "%ProgramFiles%\Python311\python.exe"
+    "%ProgramFiles%\Python310\python.exe"
+    "C:\Python314\python.exe"
+    "C:\Python313\python.exe"
+    "C:\Python312\python.exe"
+    "C:\Python311\python.exe"
+    "C:\Python310\python.exe"
+) do (
+    if exist "%%~p" (
+        "%%~p" -c "import sys" >nul 2>&1
         if !errorlevel! equ 0 (
-            set "PYTHON_EXEC=python"
-        ) else (
-            for %%d in (
-                "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-                "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-                "%ProgramFiles%\Python312\python.exe"
-                "C:\Python312\python.exe"
-            ) do (
-                if not defined PYTHON_EXEC (
-                    if exist %%d set "PYTHON_EXEC=%%~d"
-                )
-            )
+            set "PYTHON_EXEC=%%~p"
+            goto :python_detected
         )
-        
-        if not defined PYTHON_EXEC (
-            echo.
-            echo [!] Python was installed but Windows requires a fresh terminal to load PATH.
-            echo     Please close this window and double-click 'setup-python.bat' again.
-            pause
-            exit /b 0
-        )
-    ) else (
-        echo.
-        echo ============================================================
-        echo [ERROR] Python 3 belum terinstall di laptop ini!
-        echo ============================================================
-        echo Windows menampilkan pesan Microsoft Store karena Python resmi
-        echo belum dipasang atau belum dicentang "Add Python to PATH".
-        echo.
-        echo Cara instalasi mudah:
-        echo 1. Kunjungi: https://www.python.org/downloads/
-        echo 2. Download installer Python terbaru untuk Windows.
-        echo 3. SAAT INSTALL: PENTING centang kotak "Add Python to PATH" di bagian bawah!
-        echo 4. Jalankan kembali setup-python.bat setelah instalasi selesai.
-        echo.
-        pause
-        exit /b 1
     )
 )
 
-echo [OK] Python functional:
-!PYTHON_EXEC! --version
+REM Jika Python tidak ditemukan sama sekali
+echo [!] Python 3 belum terdeteksi atau terhalang alias Microsoft Store.
+if "!HAS_WINGET!"=="1" (
+    echo [!] Menginstall Python 3.12 secara otomatis via winget...
+    echo     Silakan klik 'Yes' jika muncul pop-up izin Windows UAC.
+    winget install Python.Python.3.12 --override "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" --accept-package-agreements --accept-source-agreements
+    call :refresh_path
+    
+    python -c "import sys" >nul 2>&1
+    if !errorlevel! equ 0 (
+        set "PYTHON_EXEC=python"
+        goto :python_detected
+    )
+    for %%p in (
+        "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+        "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+        "%ProgramFiles%\Python312\python.exe"
+        "C:\Python312\python.exe"
+    ) do (
+        if exist "%%~p" (
+            set "PYTHON_EXEC=%%~p"
+            goto :python_detected
+        )
+    )
+    echo.
+    echo [!] Python berhasil dipasang, tetapi Windows membutuhkan jendela baru untuk memuat PATH.
+    echo     Silakan tutup jendela ini lalu klik ganda setup-python.bat lagi.
+    echo.
+    pause
+    exit /b 0
+)
+
+echo.
+echo ============================================================
+echo [ERROR] Python 3 belum terpasang di laptop ini!
+echo ============================================================
+echo.
+echo Panduan instalasi cepat:
+echo 1. Buka browser: https://www.python.org/downloads/
+echo 2. Download installer Python [disarankan versi 3.11 atau 3.12]
+echo 3. SANGAT PENTING: Centang kotak 'Add Python to PATH' di layar awal installer!
+echo 4. Jalankan kembali setup-python.bat setelah instalasi selesai.
+echo.
+pause
+exit /b 1
+
+:python_detected
+echo [OK] Python siap digunakan:
+if "!PYTHON_EXEC!"=="python" (
+    python --version
+) else if "!PYTHON_EXEC!"=="py -3" (
+    py -3 --version
+) else (
+    "!PYTHON_EXEC!" --version
+)
 echo.
 
 REM ------------------------------------------------------------
-REM 2. CHECK AND AUTO-INSTALL NODE.JS
+REM 2. CHECK AND DETECT NODE.JS
 REM ------------------------------------------------------------
-echo Checking Node.js...
+echo [2/6] Memeriksa Node.js...
 node -v >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [!] Node.js is NOT installed.
-    if "!HAS_WINGET!"=="1" (
-        echo [!] Auto-installing Node.js LTS via winget...
-        echo     Please click Yes if Windows UAC asks for permission.
-        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
-        call :refresh_path
-        node -v >nul 2>&1
-        if !errorlevel! neq 0 (
-            echo.
-            echo [!] Node.js was installed but terminal PATH needs a restart.
-            echo     Please close this window and run 'setup-python.bat' once more.
-            pause
-            exit /b 0
-        )
-    ) else (
-        echo.
-        echo [ERROR] Node.js is required. Please download and install from:
-        echo         https://nodejs.org/
-        pause
-        exit /b 1
-    )
+if !errorlevel! equ 0 goto :nodejs_detected
+
+if exist "%ProgramFiles%\nodejs\node.exe" (
+    set "PATH=%ProgramFiles%\nodejs;!PATH!"
+)
+if exist "%LOCALAPPDATA%\Programs\nodejs\node.exe" (
+    set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
 )
 
-echo [OK] Node.js detected:
+node -v >nul 2>&1
+if !errorlevel! equ 0 goto :nodejs_detected
+
+echo [!] Node.js belum terpasang di sistem.
+if "!HAS_WINGET!"=="1" (
+    echo [!] Menginstall Node.js LTS secara otomatis via winget...
+    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    call :refresh_path
+    node -v >nul 2>&1
+    if !errorlevel! equ 0 goto :nodejs_detected
+    echo.
+    echo [!] Node.js berhasil dipasang. Terminal perlu direstart agar PATH terbaca.
+    echo     Silakan tutup jendela ini dan jalankan setup-python.bat sekali lagi.
+    echo.
+    pause
+    exit /b 0
+)
+
+echo.
+echo ============================================================
+echo [ERROR] Node.js diperlukan tetapi belum terpasang!
+echo ============================================================
+echo Silakan download dan install dari: https://nodejs.org/ [Pilih versi LTS]
+echo.
+pause
+exit /b 1
+
+:nodejs_detected
+echo [OK] Node.js terdeteksi:
 node --version
 echo.
 
 REM ------------------------------------------------------------
-REM 3. CHECK AND AUTO-INSTALL FFMPEG
+REM 3. CHECK FFMPEG (OPTIONAL / AUTO-INSTALL)
 REM ------------------------------------------------------------
-echo Checking FFmpeg...
+echo [3/6] Memeriksa FFmpeg...
 ffmpeg -version >nul 2>&1
-if !errorlevel! neq 0 (
-    echo [!] FFmpeg is NOT installed. Required for video metadata extraction.
-    if "!HAS_WINGET!"=="1" (
-        echo [!] Auto-installing FFmpeg via winget...
-        winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements
-        call :refresh_path
-        ffmpeg -version >nul 2>&1
-        if !errorlevel! equ 0 (
-            echo [OK] FFmpeg installed successfully!
-        ) else (
-            echo [!] FFmpeg installed, will be active on next terminal session.
-        )
+if !errorlevel! equ 0 (
+    echo [OK] FFmpeg siap.
+    goto :ffmpeg_done
+)
+
+echo [i] FFmpeg belum terpasang. FFmpeg dibutuhkan untuk ekstraksi frame metadata video.
+if "!HAS_WINGET!"=="1" (
+    echo [!] Menginstall FFmpeg otomatis via winget...
+    winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements
+    call :refresh_path
+    ffmpeg -version >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [OK] FFmpeg berhasil dipasang.
     ) else (
-        echo [!] Warning: FFmpeg not found. Video metadata features will be limited.
-        echo     Download: https://ffmpeg.org/download.html
+        echo [i] FFmpeg terpasang, akan aktif sempurna setelah restart terminal/laptop.
     )
 ) else (
-    echo [OK] FFmpeg detected.
+    echo [i] FFmpeg opsional belum ada. Download jika perlu: https://ffmpeg.org/download.html
 )
+
+:ffmpeg_done
 echo.
 
 REM ------------------------------------------------------------
-REM 4. CREATE AND ACTIVATE PYTHON VIRTUAL ENVIRONMENT [VENV]
+REM 4. CREATE / VALIDATE VIRTUAL ENVIRONMENT [VENV]
 REM ------------------------------------------------------------
-set "REBUILD_VENV=0"
+echo [4/6] Menyiapkan Python Virtual Environment [venv]...
+set "NEED_NEW_VENV=0"
 
+if not exist "venv" goto :create_new_venv
+if not exist "venv\Scripts\python.exe" goto :corrupt_venv
+if not exist "venv\Scripts\activate.bat" goto :corrupt_venv
+
+REM Uji apakah venv lama cocok dengan laptop ini atau hasil copy laptop lain
+"venv\Scripts\python.exe" -c "import sys" >nul 2>&1
+if !errorlevel! equ 0 (
+    echo [OK] Virtual environment [venv] yang ada valid dan kompatibel dengan laptop ini.
+    goto :activate_existing_venv
+)
+
+:corrupt_venv
+echo [!] Virtual environment lama tidak valid atau disalin dari laptop lain.
+echo     [Jalur direktori hardcoded dari laptop sebelumnya terdeteksi]
+set "NEED_NEW_VENV=1"
+
+:create_new_venv
 if exist "venv" (
-    echo Validating existing virtual environment [venv]...
-    if exist "venv\Scripts\python.exe" (
-        "venv\Scripts\python.exe" -c "import sys" >nul 2>&1
-        if !errorlevel! neq 0 (
-            echo [!] Existing venv is invalid or was copied from another laptop.
-            echo     (Hardcoded paths pointing to previous machine detected)
-            set "REBUILD_VENV=1"
-        ) else (
-            echo [OK] Existing virtual environment verified and working.
-        )
-    ) else (
-        echo [!] Virtual environment exists but is incomplete.
-        set "REBUILD_VENV=1"
-    )
+    echo [!] Menghapus venv lama yang tidak kompatibel...
+    rmdir /s /q venv >nul 2>&1
+)
+
+echo Membuat Virtual Environment [venv] baru khusus laptop ini...
+if "!PYTHON_EXEC!"=="py -3" (
+    py -3 -m venv venv
+) else if "!PYTHON_EXEC!"=="python" (
+    python -m venv venv
 ) else (
-    set "REBUILD_VENV=1"
+    "!PYTHON_EXEC!" -m venv venv
 )
 
-if "!REBUILD_VENV!"=="1" (
-    if exist "venv" (
-        echo [!] Removing incompatible virtual environment...
-        rmdir /s /q venv >nul 2>&1
-    )
-    echo Creating fresh Python virtual environment [venv] for this laptop...
-    !PYTHON_EXEC! -m venv venv
-    if !errorlevel! neq 0 (
-        echo [ERROR] Failed to create venv.
-        echo         Pastikan Python terinstall dengan benar dan bukan shortcut Microsoft Store.
-        pause
-        exit /b 1
-    )
-    echo [OK] Fresh virtual environment created successfully.
+if !errorlevel! neq 0 (
+    echo.
+    echo [ERROR] Pembuatan venv gagal!
+    echo         Pastikan Python terpasang dengan benar dan modul venv tersedia.
+    echo.
+    pause
+    exit /b 1
 )
+echo [OK] Virtual environment baru berhasil dibuat.
 
+:activate_existing_venv
 if not exist "venv\Scripts\activate.bat" (
     echo.
-    echo [ERROR] venv\Scripts\activate.bat tidak ditemukan.
-    echo         Pembuatan virtual environment gagal.
+    echo [ERROR] File venv\Scripts\activate.bat tidak ditemukan!
+    echo.
     pause
     exit /b 1
 )
@@ -232,52 +270,54 @@ if not exist "venv\Scripts\activate.bat" (
 call venv\Scripts\activate.bat
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Failed to activate venv.
-    echo         Please ensure Python is added to your PATH and restart your terminal.
+    echo [ERROR] Gagal mengaktifkan virtual environment.
+    echo.
     pause
     exit /b 1
 )
-echo [OK] Virtual environment activated.
+echo [OK] Virtual environment aktif.
 echo.
 
 REM ------------------------------------------------------------
-REM 5. INSTALL PYTHON DEPENDENCIES
+REM 5. INSTALL BACKEND DEPENDENCIES
 REM ------------------------------------------------------------
-echo Upgrading pip...
+echo [5/6] Memasang dependensi Python backend...
 python -m pip install --upgrade pip --quiet
-
-echo Installing backend Python dependencies from backend/requirements.txt...
-pip install -r backend\requirements.txt
+python -m pip install -r backend\requirements.txt
 if !errorlevel! neq 0 (
-    echo [ERROR] Failed to install backend dependencies.
+    echo.
+    echo [ERROR] Gagal memasang paket Python backend dari backend\requirements.txt!
+    echo.
     pause
     exit /b 1
 )
-echo [OK] Python dependencies installed.
+echo [OK] Paket Python backend terpasang lengkap.
 echo.
 
 REM ------------------------------------------------------------
 REM 6. INSTALL FRONTEND DEPENDENCIES
 REM ------------------------------------------------------------
+echo [6/6] Memeriksa dependensi frontend...
 if not exist "frontend" (
-    echo [ERROR] frontend folder is missing.
+    echo [ERROR] Folder frontend tidak ditemukan!
     pause
     exit /b 1
 )
 
 cd frontend
 if not exist "node_modules" (
-    echo Installing frontend node_modules [npm install]...
+    echo Memasang node_modules frontend [npm install]...
     call npm install
     if !errorlevel! neq 0 (
-        echo [ERROR] npm install failed.
+        echo.
+        echo [ERROR] npm install gagal.
         cd ..
         pause
         exit /b 1
     )
-    echo [OK] Frontend packages installed.
+    echo [OK] node_modules frontend berhasil dipasang.
 ) else (
-    echo [OK] frontend/node_modules already exists.
+    echo [OK] frontend\node_modules sudah tersedia.
 )
 cd ..
 echo.
@@ -286,40 +326,41 @@ REM ------------------------------------------------------------
 REM 7. CREATE .ENV IF NOT EXISTS
 REM ------------------------------------------------------------
 if not exist ".env" (
-    echo Creating default .env file...
+    echo Membuat template file .env...
     (
-        echo # Auto generated
-        echo # Managed by GUI
+        echo # Konfigurasi Literate Lamp
+        echo # Dikelola otomatis oleh GUI
     ) > .env
-    echo [OK] .env file created.
+    echo [OK] File .env siap.
     echo.
 )
 
 REM ------------------------------------------------------------
-REM SETUP COMPLETE
+REM SELESAI
 REM ------------------------------------------------------------
 cls
 echo.
 echo ============================================================
-echo   [SUCCESS] ALL PREREQUISITES AND ENVIRONMENT READY!
+echo   [SUKSES] SEMUA SETUP DAN DEPENDENSI TELAH SIAP!
 echo ============================================================
 echo.
-echo   - Python       : OK
-echo   - Node.js      : OK
-echo   - FFmpeg       : OK
-echo   - Virtualenv   : Ready [venv]
-echo   - Backend Deps : Installed
-echo   - Frontend Deps: Installed
+echo   - Python             : Siap
+echo   - Node.js            : Siap
+echo   - Virtual Environment: Aktif [venv khusus laptop ini]
+echo   - Backend Packages   : Terinstall
+echo   - Frontend Packages  : Terinstall
 echo.
-echo You can now start the application anytime by running:
-echo   --^> start.bat
+echo Sekarang Anda dapat menjalankan aplikasi kapan saja dengan:
+echo   --^> Klik ganda file: start.bat
 echo.
 pause
 exit /b 0
 
 REM ============================================================
-REM HELPER FUNCTION: REFRESH ENVIRONMENT PATH
+REM HELPER FUNCTION: REFRESH PATH
 REM ============================================================
 :refresh_path
-for /f "tokens=*" %%p in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')"') do set "PATH=%%p"
+if exist "%ProgramFiles%\nodejs" set "PATH=%ProgramFiles%\nodejs;!PATH!"
+if exist "%ProgramFiles(x86)%\nodejs" set "PATH=%ProgramFiles(x86)%\nodejs;!PATH!"
+if exist "%LOCALAPPDATA%\Programs\nodejs" set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
 exit /b 0

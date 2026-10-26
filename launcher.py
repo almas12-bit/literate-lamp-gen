@@ -4,6 +4,7 @@ import time
 import subprocess
 import threading
 import webbrowser
+import shutil
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
@@ -21,12 +22,30 @@ RESET = "\033[0m"
 if sys.platform == "win32":
     os.system("color")
 
+def find_npm():
+    # 1. Standard which
+    npm_path = shutil.which("npm.cmd" if sys.platform == "win32" else "npm")
+    if npm_path:
+        return npm_path
+    
+    # 2. Check standard Windows paths
+    if sys.platform == "win32":
+        candidates = [
+            os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "nodejs", "npm.cmd"),
+            os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "nodejs", "npm.cmd"),
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "nodejs", "npm.cmd"),
+            os.path.join(os.environ.get("APPDATA", ""), "npm", "npm.cmd"),
+        ]
+        for c in candidates:
+            if c and os.path.exists(c):
+                return c
+    return "npm.cmd" if sys.platform == "win32" else "npm"
+
 def stream_logs(pipe, tag, color):
     try:
         for line in iter(pipe.readline, ""):
             if not line:
                 break
-            # Clean trailing newline and print with tag
             clean_line = line.rstrip("\r\n")
             print(f"{color}[{tag}]{RESET} {clean_line}", flush=True)
     except Exception:
@@ -56,6 +75,24 @@ def main():
     print(f"{YELLOW}  Tekan Ctrl+C di jendela ini untuk mematikan semua layanan{RESET}")
     print(f"{CYAN}{'='*62}{RESET}\n")
 
+    # Pre-flight check: backend dependencies
+    try:
+        import uvicorn
+        import fastapi
+    except ImportError:
+        print(f"\n{YELLOW}[ERROR] Dependensi backend (uvicorn / fastapi) belum terinstall.{RESET}")
+        print(f"{YELLOW}[ERROR] Menjalankan instalasi otomatis via setup-python.bat disarankan.{RESET}\n")
+        input("Tekan Enter untuk keluar...")
+        sys.exit(1)
+
+    # Pre-flight check: node_modules
+    npm_bin = find_npm()
+    is_win = sys.platform == "win32"
+    node_modules_dir = os.path.join(FRONTEND_DIR, "node_modules")
+    if not os.path.exists(node_modules_dir):
+        print(f"{MAGENTA}[SYSTEM] node_modules frontend belum ada. Memasang via npm install...{RESET}")
+        subprocess.run([npm_bin, "install"], cwd=FRONTEND_DIR, shell=is_win)
+
     # 1. Start Backend
     print(f"{BLUE}[SYSTEM] Memulai Backend (FastAPI + Uvicorn)...{RESET}")
     backend_proc = subprocess.Popen(
@@ -71,7 +108,6 @@ def main():
 
     # 2. Start Frontend
     print(f"{MAGENTA}[SYSTEM] Memulai Frontend (Vite + React)...{RESET}")
-    npm_bin = "npm.cmd" if sys.platform == "win32" else "npm"
     frontend_proc = subprocess.Popen(
         [npm_bin, "run", "dev"],
         cwd=FRONTEND_DIR,
@@ -80,7 +116,8 @@ def main():
         text=True,
         encoding="utf-8",
         errors="replace",
-        bufsize=1
+        bufsize=1,
+        shell=is_win
     )
 
     # Start threads to stream logs to this single console
@@ -113,4 +150,12 @@ def main():
         print(f"{GREEN}[SYSTEM] Semua layanan berhasil dimatikan dengan aman.{RESET}\n")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"\n[FATAL ERROR] {e}\n")
+        import traceback
+        traceback.print_exc()
+        input("\nTekan Enter untuk keluar...")

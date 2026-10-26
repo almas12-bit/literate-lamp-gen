@@ -1,38 +1,52 @@
 @echo off
-chcp 65001 >nul
+chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
-
 title Literate Lamp Launcher
 
 cls
 echo.
 echo ============================================================
-echo   Literate Lamp - Starting Application
+echo   Literate Lamp - Memulai Aplikasi
 echo ============================================================
 echo.
 
-REM ============================================================
-REM CHECK AND VALIDATE VENV
-REM ============================================================
+REM ------------------------------------------------------------
+REM 1. AUTO-DETECT AND PREPEND STANDARD PATHS (NODE.JS)
+REM ------------------------------------------------------------
+if exist "%ProgramFiles%\nodejs" (
+    set "PATH=%ProgramFiles%\nodejs;!PATH!"
+)
+if exist "%ProgramFiles(x86)%\nodejs" (
+    set "PATH=%ProgramFiles(x86)%\nodejs;!PATH!"
+)
+if exist "%LOCALAPPDATA%\Programs\nodejs" (
+    set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
+)
 
-set "VENV_OK=0"
+REM ------------------------------------------------------------
+REM 2. CHECK AND VALIDATE VIRTUAL ENVIRONMENT
+REM ------------------------------------------------------------
+set "VENV_READY=0"
 if exist "venv\Scripts\python.exe" (
-    "venv\Scripts\python.exe" -c "import sys" >nul 2>&1
+    "venv\Scripts\python.exe" -c "import uvicorn, fastapi, httpx" >nul 2>&1
     if !errorlevel! equ 0 (
-        set "VENV_OK=1"
+        set "VENV_READY=1"
     )
 )
 
-if "!VENV_OK!"=="0" (
-    echo [!] Virtual environment [venv] is missing or incompatible with this laptop.
-    echo [!] Running setup-python.bat automatically to configure this machine...
+if "!VENV_READY!"=="0" (
+    echo [i] Virtual environment [venv] belum siap atau dipindahkan dari laptop lain.
+    echo [i] Menjalankan setup-python.bat secara otomatis...
     echo.
     call setup-python.bat
     if !errorlevel! neq 0 (
         echo.
-        echo [ERROR] Auto-setup failed. Please check the logs above.
+        echo ============================================================
+        echo [ERROR] Setup otomatis gagal. Silakan periksa pesan error di atas.
+        echo ============================================================
+        echo.
         pause
         exit /b 1
     )
@@ -40,8 +54,11 @@ if "!VENV_OK!"=="0" (
 
 if not exist "venv\Scripts\activate.bat" (
     echo.
+    echo ============================================================
     echo [ERROR] Virtual environment belum berhasil dibuat.
-    echo         Silakan jalankan setup-python.bat secara manual.
+    echo         Silakan klik ganda file setup-python.bat secara langsung.
+    echo ============================================================
+    echo.
     pause
     exit /b 1
 )
@@ -49,82 +66,99 @@ if not exist "venv\Scripts\activate.bat" (
 call venv\Scripts\activate.bat
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Failed to activate venv.
+    echo ============================================================
+    echo [ERROR] Gagal mengaktifkan virtual environment [venv].
+    echo ============================================================
+    echo.
     pause
     exit /b 1
 )
 
-echo [OK] Python environment ready
+echo [OK] Python virtual environment aktif.
 echo.
 
-REM ============================================================
-REM CREATE .ENV IF NOT EXISTS
-REM ============================================================
-
+REM ------------------------------------------------------------
+REM 3. CREATE .ENV IF NOT EXISTS
+REM ------------------------------------------------------------
 if not exist ".env" (
-    echo Creating .env...
+    echo Menyiapkan file konfigurasi .env...
     (
-        echo # Auto generated
-        echo # Managed by GUI
+        echo # Konfigurasi Literate Lamp
+        echo # Dikelola otomatis oleh GUI
     ) > .env
-    echo [OK] .env created
+    echo [OK] File .env siap.
     echo.
 )
 
-REM ============================================================
-REM CHECK NODE
-REM ============================================================
-
-where node >nul 2>&1
+REM ------------------------------------------------------------
+REM 4. CHECK NODE.JS
+REM ------------------------------------------------------------
+node -v >nul 2>&1
 if !errorlevel! neq 0 (
-    echo [!] Node.js not detected in PATH.
-    echo [!] Running setup-python.bat to install prerequisites...
+    echo [!] Node.js belum terdeteksi di sistem.
+    echo [!] Menjalankan setup-python.bat untuk instalasi...
     call setup-python.bat
     if !errorlevel! neq 0 (
-        echo [ERROR] Node.js is required. Download: https://nodejs.org/
+        echo.
+        echo ============================================================
+        echo [ERROR] Node.js diperlukan tetapi belum terpasang.
+        echo         Silakan download dari: https://nodejs.org/ [LTS]
+        echo ============================================================
+        echo.
         pause
         exit /b 1
     )
 )
 
-echo [OK] Node.js detected
+echo [OK] Node.js siap:
+node --version
 echo.
 
-REM ============================================================
-REM INSTALL FRONTEND DEPENDENCIES
-REM ============================================================
-
+REM ------------------------------------------------------------
+REM 5. CHECK FRONTEND DEPENDENCIES
+REM ------------------------------------------------------------
 if not exist "frontend" (
-    echo [ERROR] frontend folder missing
+    echo.
+    echo ============================================================
+    echo [ERROR] Folder frontend tidak ditemukan!
+    echo ============================================================
+    echo.
     pause
     exit /b 1
 )
 
 if not exist "frontend\node_modules" (
-    echo Installing frontend dependencies...
+    echo [!] Memasang dependensi frontend [npm install]...
     cd frontend
     call npm install
     if !errorlevel! neq 0 (
         echo.
-        echo [ERROR] Failed to install frontend dependencies
+        echo ============================================================
+        echo [ERROR] Gagal memasang dependensi frontend.
+        echo ============================================================
         cd ..
+        echo.
         pause
         exit /b 1
     )
     cd ..
 )
 
-echo [OK] Frontend ready
+echo [OK] Frontend siap.
 echo.
 
-REM ============================================================
-REM START SERVICES (SINGLE TERMINAL MODE)
-REM ============================================================
+REM ------------------------------------------------------------
+REM 6. LAUNCH APPLICATION (ALL-IN-ONE CONSOLE)
+REM ------------------------------------------------------------
+echo Menjalankan aplikasi Literate Lamp...
+echo.
 
-python launcher.py
+REM Gunakan python dari venv secara eksplisit agar bebas dari bentrok Microsoft Store
+venv\Scripts\python.exe launcher.py
 
-if !errorlevel! neq 0 (
-    echo.
-    echo Application stopped.
-    pause
-)
+echo.
+echo ============================================================
+echo   Aplikasi Literate Lamp telah berhenti.
+echo ============================================================
+echo.
+pause
