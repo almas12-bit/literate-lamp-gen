@@ -3,9 +3,8 @@ chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
-title Literate Lamp - Setup Lingkungan & Python
+title Literate Lamp - Setup Lingkungan dan Python
 
-cls
 echo.
 echo ============================================================
 echo   Literate Lamp - Setup Lingkungan dan Dependensi Otomatis
@@ -31,17 +30,17 @@ if !errorlevel! equ 0 (
     set "HAS_WINGET=1"
     echo [OK] Windows Package Manager [winget] terdeteksi.
 ) else (
-    echo [i] winget tidak ditemukan. Sistem akan menggunakan pengecekan direktori standar.
+    echo [i] winget tidak ditemukan. Sistem akan menggunakan pengecekan manual jika perlu.
 )
 echo.
 
 REM ------------------------------------------------------------
 REM 1. CHECK AND DETECT PYTHON
 REM ------------------------------------------------------------
-echo [1/6] Memeriksa Python...
+echo [1/6] Memeriksa instalasi Python...
 set "PYTHON_EXEC="
 
-REM Uji perintah 'python' bawaan PATH (pastikan bukan dummy Microsoft Store)
+REM Uji perintah 'python' bawaan PATH
 python -c "import sys" >nul 2>&1
 if !errorlevel! equ 0 (
     set "PYTHON_EXEC=python"
@@ -81,11 +80,11 @@ for %%p in (
 )
 
 REM Jika Python tidak ditemukan sama sekali
-echo [!] Python 3 belum terdeteksi atau terhalang alias Microsoft Store.
+echo [!] Python 3 belum terpasang atau terhalang alias Microsoft Store.
 if "!HAS_WINGET!"=="1" (
     echo [!] Menginstall Python 3.12 secara otomatis via winget...
-    echo     Silakan klik 'Yes' jika muncul pop-up izin Windows UAC.
-    winget install Python.Python.3.12 --override "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" --accept-package-agreements --accept-source-agreements
+    echo     CATATAN: Jika muncul pop-up Windows UAC izin administrator, silakan klik 'YES' / 'YA'.
+    winget install Python.Python.3.12 --override "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" --accept-package-agreements --accept-source-agreements --disable-interactivity
     call :refresh_path
     
     python -c "import sys" >nul 2>&1
@@ -154,16 +153,28 @@ if exist "%LOCALAPPDATA%\Programs\nodejs\node.exe" (
 node -v >nul 2>&1
 if !errorlevel! equ 0 goto :nodejs_detected
 
-echo [!] Node.js belum terpasang di sistem.
+echo [!] Node.js belum terdeteksi di laptop ini.
 if "!HAS_WINGET!"=="1" (
-    echo [!] Menginstall Node.js LTS secara otomatis via winget...
-    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
+    echo.
+    echo [INFO] Sedang mencoba memasang Node.js LTS otomatis via winget...
+    echo        PERHATIAN: Jika muncul jendela izin Windows [UAC], silakan klik 'YES' / 'YA'.
+    echo        Proses unduh dan instalasi biasanya memakan waktu 1-2 menit.
+    echo.
+    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --disable-interactivity
     call :refresh_path
+    
     node -v >nul 2>&1
     if !errorlevel! equ 0 goto :nodejs_detected
+    
+    if exist "%ProgramFiles%\nodejs\node.exe" (
+        set "PATH=%ProgramFiles%\nodejs;!PATH!"
+        goto :nodejs_detected
+    )
+    
     echo.
-    echo [!] Node.js berhasil dipasang. Terminal perlu direstart agar PATH terbaca.
-    echo     Silakan tutup jendela ini dan jalankan setup-python.bat sekali lagi.
+    echo [i] Node.js telah selesai diinstal via winget.
+    echo     Terminal perlu ditutup dan dibuka kembali agar PATH Node.js aktif.
+    echo     Silakan tutup jendela ini, lalu jalankan setup-python.bat sekali lagi.
     echo.
     pause
     exit /b 0
@@ -171,15 +182,19 @@ if "!HAS_WINGET!"=="1" (
 
 echo.
 echo ============================================================
-echo [ERROR] Node.js diperlukan tetapi belum terpasang!
+echo [PERHATIAN] Node.js diperlukan untuk menjalankan tampilan antarmuka web.
 echo ============================================================
-echo Silakan download dan install dari: https://nodejs.org/ [Pilih versi LTS]
+echo.
+echo Silakan download dan pasang Node.js LTS secara manual:
+echo 1. Kunjungi: https://nodejs.org/
+echo 2. Download dan install versi LTS [klik Next sampai selesai].
+echo 3. Setelah selesai, jalankan kembali setup-python.bat.
 echo.
 pause
 exit /b 1
 
 :nodejs_detected
-echo [OK] Node.js terdeteksi:
+echo [OK] Node.js siap:
 node --version
 echo.
 
@@ -193,19 +208,19 @@ if !errorlevel! equ 0 (
     goto :ffmpeg_done
 )
 
-echo [i] FFmpeg belum terpasang. FFmpeg dibutuhkan untuk ekstraksi frame metadata video.
+echo [i] FFmpeg belum terpasang (opsional untuk ekstraksi metadata frame video).
 if "!HAS_WINGET!"=="1" (
-    echo [!] Menginstall FFmpeg otomatis via winget...
-    winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements
+    echo     Mencoba memasang FFmpeg via winget...
+    winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements --disable-interactivity >nul 2>&1
     call :refresh_path
     ffmpeg -version >nul 2>&1
     if !errorlevel! equ 0 (
         echo [OK] FFmpeg berhasil dipasang.
     ) else (
-        echo [i] FFmpeg terpasang, akan aktif sempurna setelah restart terminal/laptop.
+        echo [i] FFmpeg akan aktif pada sesi berikutnya.
     )
 ) else (
-    echo [i] FFmpeg opsional belum ada. Download jika perlu: https://ffmpeg.org/download.html
+    echo [i] FFmpeg dapat dipasang manual jika diperlukan: https://ffmpeg.org/download.html
 )
 
 :ffmpeg_done
@@ -229,17 +244,20 @@ if !errorlevel! equ 0 (
 )
 
 :corrupt_venv
-echo [!] Virtual environment lama tidak valid atau disalin dari laptop lain.
-echo     [Jalur direktori hardcoded dari laptop sebelumnya terdeteksi]
+echo [!] Virtual environment lama tidak kompatibel dengan laptop ini [hasil salin dari laptop lain].
+echo     Sedang membersihkan venv lama...
 set "NEED_NEW_VENV=1"
 
 :create_new_venv
 if exist "venv" (
-    echo [!] Menghapus venv lama yang tidak kompatibel...
     rmdir /s /q venv >nul 2>&1
 )
 
-echo Membuat Virtual Environment [venv] baru khusus laptop ini...
+echo.
+echo [INFO] Sedang membuat Virtual Environment [venv] baru khusus laptop ini...
+echo        [Proses ini memakan waktu sekitar 15-30 detik, mohon tunggu]...
+echo.
+
 if "!PYTHON_EXEC!"=="py -3" (
     py -3 -m venv venv
 ) else if "!PYTHON_EXEC!"=="python" (
@@ -250,8 +268,10 @@ if "!PYTHON_EXEC!"=="py -3" (
 
 if !errorlevel! neq 0 (
     echo.
+    echo ============================================================
     echo [ERROR] Pembuatan venv gagal!
-    echo         Pastikan Python terpasang dengan benar dan modul venv tersedia.
+    echo ============================================================
+    echo Pastikan instalasi Python memiliki modul standard venv.
     echo.
     pause
     exit /b 1
@@ -282,22 +302,29 @@ REM ------------------------------------------------------------
 REM 5. INSTALL BACKEND DEPENDENCIES
 REM ------------------------------------------------------------
 echo [5/6] Memasang dependensi Python backend...
-python -m pip install --upgrade pip --quiet
+echo [INFO] Mengunduh dan memasang paket backend [FastAPI, Uvicorn, HTTPX]...
+echo        [Proses ini menggunakan koneksi internet, mohon tunggu]...
+echo.
+
 python -m pip install -r backend\requirements.txt
 if !errorlevel! neq 0 (
     echo.
-    echo [ERROR] Gagal memasang paket Python backend dari backend\requirements.txt!
+    echo ============================================================
+    echo [ERROR] Gagal memasang paket Python backend!
+    echo ============================================================
+    echo Pastikan laptop terhubung ke internet.
     echo.
     pause
     exit /b 1
 )
+echo.
 echo [OK] Paket Python backend terpasang lengkap.
 echo.
 
 REM ------------------------------------------------------------
 REM 6. INSTALL FRONTEND DEPENDENCIES
 REM ------------------------------------------------------------
-echo [6/6] Memeriksa dependensi frontend...
+echo [6/6] Memeriksa dependensi antarmuka frontend...
 if not exist "frontend" (
     echo [ERROR] Folder frontend tidak ditemukan!
     pause
@@ -306,18 +333,23 @@ if not exist "frontend" (
 
 cd frontend
 if not exist "node_modules" (
-    echo Memasang node_modules frontend [npm install]...
+    echo.
+    echo [INFO] Folder node_modules belum ada.
+    echo        Memasang paket frontend via npm install [mohon tunggu 1-2 menit]...
+    echo.
     call npm install
     if !errorlevel! neq 0 (
         echo.
-        echo [ERROR] npm install gagal.
+        echo ============================================================
+        echo [ERROR] npm install gagal!
+        echo ============================================================
         cd ..
         pause
         exit /b 1
     )
-    echo [OK] node_modules frontend berhasil dipasang.
+    echo [OK] Dependensi frontend berhasil dipasang.
 ) else (
-    echo [OK] frontend\node_modules sudah tersedia.
+    echo [OK] Folder frontend\node_modules sudah tersedia.
 )
 cd ..
 echo.
@@ -326,7 +358,7 @@ REM ------------------------------------------------------------
 REM 7. CREATE .ENV IF NOT EXISTS
 REM ------------------------------------------------------------
 if not exist ".env" (
-    echo Membuat template file .env...
+    echo Menyiapkan file konfigurasi .env...
     (
         echo # Konfigurasi Literate Lamp
         echo # Dikelola otomatis oleh GUI
@@ -338,7 +370,6 @@ if not exist ".env" (
 REM ------------------------------------------------------------
 REM SELESAI
 REM ------------------------------------------------------------
-cls
 echo.
 echo ============================================================
 echo   [SUKSES] SEMUA SETUP DAN DEPENDENSI TELAH SIAP!
