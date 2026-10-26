@@ -38,6 +38,14 @@ if "!VENV_OK!"=="0" (
     )
 )
 
+if not exist "venv\Scripts\activate.bat" (
+    echo.
+    echo [ERROR] Virtual environment belum berhasil dibuat.
+    echo         Silakan jalankan setup-python.bat secara manual.
+    pause
+    exit /b 1
+)
+
 call venv\Scripts\activate.bat
 if !errorlevel! neq 0 (
     echo.

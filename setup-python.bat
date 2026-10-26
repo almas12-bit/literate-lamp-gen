@@ -17,7 +17,7 @@ REM 0. CHECK WINDOWS PACKAGE MANAGER [WINGET]
 REM ------------------------------------------------------------
 set "HAS_WINGET=0"
 where winget >nul 2>&1
-if %errorlevel% equ 0 (
+if !errorlevel! equ 0 (
     set "HAS_WINGET=1"
     echo [OK] Windows Package Manager [winget] detected.
 ) else (
@@ -29,49 +29,112 @@ REM ------------------------------------------------------------
 REM 1. CHECK AND AUTO-INSTALL PYTHON
 REM ------------------------------------------------------------
 echo Checking Python...
-where python >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [!] Python is NOT installed.
+set "PYTHON_EXEC="
+
+REM Test if 'python' works and is not the Microsoft Store dummy shortcut
+python -c "import sys" >nul 2>&1
+if !errorlevel! equ 0 (
+    set "PYTHON_EXEC=python"
+) else (
+    REM Check Python Launcher 'py'
+    py -3 -c "import sys" >nul 2>&1
+    if !errorlevel! equ 0 (
+        set "PYTHON_EXEC=py -3"
+    ) else (
+        REM Search standard install directories if PATH was not set
+        for %%d in (
+            "%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+            "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+            "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+            "%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+            "%ProgramFiles%\Python313\python.exe"
+            "%ProgramFiles%\Python312\python.exe"
+            "%ProgramFiles%\Python311\python.exe"
+            "C:\Python314\python.exe"
+            "C:\Python313\python.exe"
+            "C:\Python312\python.exe"
+            "C:\Python311\python.exe"
+        ) do (
+            if not defined PYTHON_EXEC (
+                if exist %%d (
+                    %%d -c "import sys" >nul 2>&1
+                    if !errorlevel! equ 0 (
+                        set "PYTHON_EXEC=%%~d"
+                    )
+                )
+            )
+        )
+    )
+)
+
+if not defined PYTHON_EXEC (
+    echo [!] Python is NOT installed (or only Microsoft Store dummy shortcut was found).
     if "!HAS_WINGET!"=="1" (
         echo [!] Auto-installing Python 3.12 via winget...
         echo     Please click Yes if Windows UAC asks for permission.
-        winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements
+        winget install Python.Python.3.12 --override "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" --accept-package-agreements --accept-source-agreements
         call :refresh_path
-        where python >nul 2>&1
-        if !errorlevel! neq 0 (
+        
+        REM Test again after winget install
+        python -c "import sys" >nul 2>&1
+        if !errorlevel! equ 0 (
+            set "PYTHON_EXEC=python"
+        ) else (
+            for %%d in (
+                "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+                "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+                "%ProgramFiles%\Python312\python.exe"
+                "C:\Python312\python.exe"
+            ) do (
+                if not defined PYTHON_EXEC (
+                    if exist %%d set "PYTHON_EXEC=%%~d"
+                )
+            )
+        )
+        
+        if not defined PYTHON_EXEC (
             echo.
-            echo [!] Python was installed but terminal PATH needs a restart.
-            echo     Please close this window and run 'setup-python.bat' once more.
+            echo [!] Python was installed but Windows requires a fresh terminal to load PATH.
+            echo     Please close this window and double-click 'setup-python.bat' again.
             pause
             exit /b 0
         )
     ) else (
         echo.
-        echo [ERROR] Python 3 is required. Please download and install from:
-        echo         https://www.python.org/downloads/
-        echo         Make sure to check "Add Python to PATH" during installation.
+        echo ============================================================
+        echo [ERROR] Python 3 belum terinstall di laptop ini!
+        echo ============================================================
+        echo Windows menampilkan pesan Microsoft Store karena Python resmi
+        echo belum dipasang atau belum dicentang "Add Python to PATH".
+        echo.
+        echo Cara instalasi mudah:
+        echo 1. Kunjungi: https://www.python.org/downloads/
+        echo 2. Download installer Python terbaru untuk Windows.
+        echo 3. SAAT INSTALL: PENTING centang kotak "Add Python to PATH" di bagian bawah!
+        echo 4. Jalankan kembali setup-python.bat setelah instalasi selesai.
+        echo.
         pause
         exit /b 1
     )
 )
 
-echo [OK] Python detected:
-python --version
+echo [OK] Python functional:
+!PYTHON_EXEC! --version
 echo.
 
 REM ------------------------------------------------------------
 REM 2. CHECK AND AUTO-INSTALL NODE.JS
 REM ------------------------------------------------------------
 echo Checking Node.js...
-where node >nul 2>&1
-if %errorlevel% neq 0 (
+node -v >nul 2>&1
+if !errorlevel! neq 0 (
     echo [!] Node.js is NOT installed.
     if "!HAS_WINGET!"=="1" (
         echo [!] Auto-installing Node.js LTS via winget...
         echo     Please click Yes if Windows UAC asks for permission.
         winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
         call :refresh_path
-        where node >nul 2>&1
+        node -v >nul 2>&1
         if !errorlevel! neq 0 (
             echo.
             echo [!] Node.js was installed but terminal PATH needs a restart.
@@ -96,14 +159,14 @@ REM ------------------------------------------------------------
 REM 3. CHECK AND AUTO-INSTALL FFMPEG
 REM ------------------------------------------------------------
 echo Checking FFmpeg...
-where ffmpeg >nul 2>&1
-if %errorlevel% neq 0 (
+ffmpeg -version >nul 2>&1
+if !errorlevel! neq 0 (
     echo [!] FFmpeg is NOT installed. Required for video metadata extraction.
     if "!HAS_WINGET!"=="1" (
         echo [!] Auto-installing FFmpeg via winget...
         winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements
         call :refresh_path
-        where ffmpeg >nul 2>&1
+        ffmpeg -version >nul 2>&1
         if !errorlevel! equ 0 (
             echo [OK] FFmpeg installed successfully!
         ) else (
@@ -135,7 +198,7 @@ if exist "venv" (
             echo [OK] Existing virtual environment verified and working.
         )
     ) else (
-        echo [!] Virtual environment exists but is missing python.exe.
+        echo [!] Virtual environment exists but is incomplete.
         set "REBUILD_VENV=1"
     )
 ) else (
@@ -148,13 +211,22 @@ if "!REBUILD_VENV!"=="1" (
         rmdir /s /q venv >nul 2>&1
     )
     echo Creating fresh Python virtual environment [venv] for this laptop...
-    python -m venv venv
+    !PYTHON_EXEC! -m venv venv
     if !errorlevel! neq 0 (
-        echo [ERROR] Failed to create venv. Make sure Python is functioning properly.
+        echo [ERROR] Failed to create venv.
+        echo         Pastikan Python terinstall dengan benar dan bukan shortcut Microsoft Store.
         pause
         exit /b 1
     )
     echo [OK] Fresh virtual environment created successfully.
+)
+
+if not exist "venv\Scripts\activate.bat" (
+    echo.
+    echo [ERROR] venv\Scripts\activate.bat tidak ditemukan.
+    echo         Pembuatan virtual environment gagal.
+    pause
+    exit /b 1
 )
 
 call venv\Scripts\activate.bat
@@ -176,7 +248,7 @@ python -m pip install --upgrade pip --quiet
 
 echo Installing backend Python dependencies from backend/requirements.txt...
 pip install -r backend\requirements.txt
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
     echo [ERROR] Failed to install backend dependencies.
     pause
     exit /b 1
