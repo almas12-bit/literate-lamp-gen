@@ -121,22 +121,47 @@ echo.
 REM ------------------------------------------------------------
 REM 4. CREATE AND ACTIVATE PYTHON VIRTUAL ENVIRONMENT [VENV]
 REM ------------------------------------------------------------
-if not exist "venv" (
-    echo Creating Python virtual environment [venv]...
+set "REBUILD_VENV=0"
+
+if exist "venv" (
+    echo Validating existing virtual environment [venv]...
+    if exist "venv\Scripts\python.exe" (
+        "venv\Scripts\python.exe" -c "import sys" >nul 2>&1
+        if !errorlevel! neq 0 (
+            echo [!] Existing venv is invalid or was copied from another laptop.
+            echo     (Hardcoded paths pointing to previous machine detected)
+            set "REBUILD_VENV=1"
+        ) else (
+            echo [OK] Existing virtual environment verified and working.
+        )
+    ) else (
+        echo [!] Virtual environment exists but is missing python.exe.
+        set "REBUILD_VENV=1"
+    )
+) else (
+    set "REBUILD_VENV=1"
+)
+
+if "!REBUILD_VENV!"=="1" (
+    if exist "venv" (
+        echo [!] Removing incompatible virtual environment...
+        rmdir /s /q venv >nul 2>&1
+    )
+    echo Creating fresh Python virtual environment [venv] for this laptop...
     python -m venv venv
-    if %errorlevel% neq 0 (
-        echo [ERROR] Failed to create venv.
+    if !errorlevel! neq 0 (
+        echo [ERROR] Failed to create venv. Make sure Python is functioning properly.
         pause
         exit /b 1
     )
-    echo [OK] Virtual environment created.
-) else (
-    echo [OK] Existing virtual environment found.
+    echo [OK] Fresh virtual environment created successfully.
 )
 
 call venv\Scripts\activate.bat
-if %errorlevel% neq 0 (
+if !errorlevel! neq 0 (
+    echo.
     echo [ERROR] Failed to activate venv.
+    echo         Please ensure Python is added to your PATH and restart your terminal.
     pause
     exit /b 1
 )
