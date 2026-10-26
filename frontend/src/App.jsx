@@ -24,7 +24,7 @@ const AS_CAT_MAP = {
 export default function App() {
   const [theme, setTheme]               = useState('light');
   const [models, setModels]             = useState([]);
-  const [currentModel, setCurrentModel] = useState('gemini-2.5-flash');
+  const [currentModel, setCurrentModel] = useState('gemini-3.5-flash-lite');
   const [platforms, setPlatforms]       = useState(['shutterstock','adobe_stock']);
   const [kwCount, setKwCount]           = useState(45);
   const [keysInfo, setKeysInfo]         = useState([]);
@@ -74,7 +74,7 @@ export default function App() {
         const h = await healthCheck();
         setBackendOk(true);
         setFfmpegOk(h.data.ffmpeg);
-        setCurrentModel(h.data.model || 'gemini-2.5-flash');
+        setCurrentModel(h.data.model || 'gemini-3.5-flash-lite');
         setPlatforms(h.data.platforms || ['shutterstock']);
         setKwCount(h.data.keyword_count || 45);
         if (h.data.rules) setRulesState(h.data.rules);

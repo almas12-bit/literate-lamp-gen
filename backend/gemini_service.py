@@ -18,6 +18,7 @@ class ApiKeyManager:
     def __init__(self):
         self.keys: List[str] = []
         self.statuses: Dict[str, str] = {}
+        self.error_messages: Dict[str, str] = {}
         self.current_index: int = 0
         self._lock = asyncio.Lock()
         self._rate_limit_reset: Dict[str, float] = {}
@@ -25,11 +26,19 @@ class ApiKeyManager:
     def set_keys(self, keys: List[str]):
         self.keys = [k.strip() for k in keys if k.strip()]
         self.statuses = {k: KeyStatus.ACTIVE for k in self.keys}
+        self.error_messages = {}
         self.current_index = 0
         self._rate_limit_reset = {}
 
     def get_keys_info(self) -> List[Dict]:
-        return [{"key": f"...{k[-6:]}", "status": self.statuses.get(k, KeyStatus.ACTIVE)} for k in self.keys]
+        return [
+            {
+                "key": f"{k[:4]}...{k[-4:]}" if len(k) > 10 else f"...{k[-4:]}",
+                "status": self.statuses.get(k, KeyStatus.ACTIVE),
+                "error": self.error_messages.get(k, "")
+            }
+            for k in self.keys
+        ]
 
     async def get_next_key(self) -> Optional[str]:
         async with self._lock:
@@ -50,40 +59,103 @@ class ApiKeyManager:
             self.statuses[key] = KeyStatus.RATE_LIMITED
             self._rate_limit_reset[key] = time.time() + 65
 
-    async def mark_error(self, key: str):
+    async def mark_error(self, key: str, message: str = ""):
         async with self._lock:
             self.statuses[key] = KeyStatus.ERROR
+            if message:
+                self.error_messages[key] = message
 
 key_manager = ApiKeyManager()
 
 async def call_gemini(model: str, parts: List[Dict], max_retries: int = None) -> Dict:
     max_retries = max_retries or max(len(key_manager.keys) * 2, 3)
+    last_err_msg = ""
     for attempt in range(max_retries):
         key = await key_manager.get_next_key()
         if not key:
-            raise Exception("All API keys exhausted or rate-limited. Please wait or add more keys.")
-        url = f"{GEMINI_API_BASE}/{model}:generateContent?key={key}"
-        payload = {"contents": [{"parts": parts}], "generationConfig": {"responseMimeType": "application/json"}}
+            raise Exception(f"All API keys exhausted or rate-limited. {last_err_msg}".strip())
+        
+        # Dual-support: send via official SDK header (x-goog-api-key), with automatic query param fallback
+        url = f"{GEMINI_API_BASE}/{model}:generateContent"
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": key,
+        }
+        gen_config = {
+            "responseMimeType": "application/json",
+            "temperature": 0.3
+        }
+        payload = {"contents": [{"parts": parts}], "generationConfig": gen_config}
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(url, json=payload)
-            if response.status_code == 429:
-                await key_manager.mark_rate_limited(key)
-                await asyncio.sleep(1)
-                continue
+                # 1. Primary: Official Google GenAI SDK header (supports both AIza and AQ keys)
+                response = await client.post(url, headers=headers, json=payload)
+
+                # 2. Fallback: If header rejected with 401/403, retry via URL query parameter ?key=...
+                if response.status_code in (401, 403):
+                    fallback_resp = await client.post(f"{url}?key={key}", json=payload)
+                    if fallback_resp.status_code == 200:
+                        response = fallback_resp
+            
             if response.status_code == 200:
                 result = response.json()
                 raw = result["candidates"][0]["content"]["parts"][0]["text"]
                 return json.loads(raw)
-            if response.status_code in (400, 403):
-                await key_manager.mark_error(key)
+            
+            err_text = response.text
+            logger.error(f"Gemini API returned status {response.status_code}: {err_text}")
+            
+            try:
+                err_data = response.json()
+                msg = err_data.get("error", {}).get("message", err_text[:120])
+            except Exception:
+                msg = err_text[:120]
+            
+            last_err_msg = f"Last error ({response.status_code}): {msg}"
+
+            if response.status_code == 429:
+                await key_manager.mark_rate_limited(key)
+                await asyncio.sleep(1)
+                continue
+            
+            if response.status_code in (503, 404):
+                # 503 (High Demand) or 404 (Model Retired): Auto-route to verified working models
+                logger.warning(f"Google status {response.status_code} for '{model}'. Routing to verified fallback models...")
+                alt_models = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]
+                for alt_m in alt_models:
+                    if alt_m != model:
+                        alt_url = f"{GEMINI_API_BASE}/{alt_m}:generateContent"
+                        try:
+                            async with httpx.AsyncClient(timeout=120.0) as client:
+                                alt_resp = await client.post(alt_url, headers=headers, json=payload)
+                            if alt_resp.status_code == 200:
+                                result = alt_resp.json()
+                                raw = result["candidates"][0]["content"]["parts"][0]["text"]
+                                logger.info(f"Job completed successfully using verified fallback model '{alt_m}'!")
+                                return json.loads(raw)
+                        except Exception:
+                            pass
+                if response.status_code == 404:
+                    raise Exception(f"Model '{model}' tidak tersedia di akun Anda: {msg}")
+                logger.warning("Google servers currently busy. Waiting 3s before retry...")
+                await asyncio.sleep(3)
+                continue
+
+            if response.status_code in (400, 401, 403):
+                await key_manager.mark_error(key, f"HTTP {response.status_code}: {msg}")
+                if len(key_manager.keys) <= 1:
+                    raise Exception(f"Gemini API error ({response.status_code}): {msg}")
+            
             await asyncio.sleep(1)
         except asyncio.CancelledError:
             raise
         except Exception as e:
+            if "Gemini API error" in str(e):
+                raise
             logger.error(f"Request error: {e}")
+            last_err_msg = str(e)
             await asyncio.sleep(2)
-    raise Exception(f"Failed after {max_retries} attempts")
+    raise Exception(f"Failed after {max_retries} attempts. {last_err_msg}".strip())
 
 import re
 

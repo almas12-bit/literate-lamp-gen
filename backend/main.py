@@ -46,9 +46,46 @@ def clear_upload_dir():
             except Exception:
                 pass
 
+ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+
+def load_keys_from_env():
+    if os.path.exists(ENV_FILE):
+        try:
+            with open(ENV_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            keys = []
+            for line in lines:
+                line = line.strip()
+                if line.startswith("GEMINI_API_KEY=") or line.startswith("GEMINI_API_KEYS="):
+                    val = line.split("=", 1)[1].strip().strip('"\'')
+                    for k in val.split(","):
+                        if k.strip():
+                            keys.append(k.strip())
+            if keys:
+                key_manager.set_keys(keys)
+                logger.info(f"Loaded {len(keys)} API key(s) from .env")
+        except Exception as e:
+            logger.error(f"Error loading keys from .env: {e}")
+
+def save_keys_to_env(keys: List[str]):
+    try:
+        existing_lines = []
+        if os.path.exists(ENV_FILE):
+            with open(ENV_FILE, "r", encoding="utf-8") as f:
+                existing_lines = f.readlines()
+        new_lines = [l for l in existing_lines if not l.startswith("GEMINI_API_KEY=") and not l.startswith("GEMINI_API_KEYS=")]
+        if keys:
+            joined = ",".join(keys)
+            new_lines.append(f'GEMINI_API_KEYS="{joined}"\n')
+        with open(ENV_FILE, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except Exception as e:
+        logger.error(f"Error saving keys to .env: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     clear_upload_dir()
+    load_keys_from_env()
 
 selected_model: str = GEMINI_MODELS[0]
 active_platforms: List[str] = ["shutterstock", "adobe_stock"]
@@ -160,11 +197,37 @@ async def set_keys(payload: KeysPayload):
     if not lines:
         raise HTTPException(400, "No valid API keys provided")
     key_manager.set_keys(lines)
-    return {"message": f"{len(lines)} key(s) loaded", "count": len(lines)}
+    save_keys_to_env(lines)
+    return {"message": f"{len(lines)} key(s) loaded and saved", "count": len(lines)}
 
 @app.get("/keys/status")
 async def keys_status():
     return {"keys": key_manager.get_keys_info()}
+
+@app.post("/keys/test")
+async def test_keys():
+    if not key_manager.keys:
+        return {"ok": False, "message": "Belum ada API key yang terdaftar. Masukkan API key terlebih dahulu."}
+    try:
+        # Use gemini-3.5-flash-lite (verified active & fast) to test key validity
+        test_model = "gemini-3.5-flash-lite" if "gemini-3.5-flash-lite" in GEMINI_MODELS else selected_model
+        res = await call_gemini(
+            model=test_model,
+            parts=[{"text": "Test connection. Return JSON: {\"status\": \"ok\"}"}],
+            max_retries=len(key_manager.keys)
+        )
+        return {
+            "ok": True,
+            "message": f"Koneksi Berhasil! API Key aktif dan terhubung ke Google AI Studio ({test_model}).",
+            "keys": key_manager.get_keys_info()
+        }
+    except Exception as e:
+        logger.error(f"Test keys error: {e}")
+        return {
+            "ok": False,
+            "message": f"Koneksi Gagal: {str(e)}",
+            "keys": key_manager.get_keys_info()
+        }
 
 @app.post("/model")
 async def set_model(payload: ModelPayload):

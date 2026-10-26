@@ -6,6 +6,7 @@ export const getModels       = ()      => api.get('/models');
 export const getCategories   = ()      => api.get('/categories');
 export const setKeys         = (t)     => api.post('/keys', { keys_text: t });
 export const getKeysStatus   = ()      => api.get('/keys/status');
+export const testKeys         = ()      => api.post('/keys/test');
 export const setModel        = (m)     => api.post('/model', { model: m });
 export const setPlatforms    = (p)     => api.post('/platforms', { platforms: p });
 export const setKeywordCount = (c)     => api.post('/keyword-count', { count: c });
