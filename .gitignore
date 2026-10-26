@@ -60,3 +60,5 @@ logs/
 .pytest_cache/
 dist/
 build/
+uploads/
+backend/uploads/
