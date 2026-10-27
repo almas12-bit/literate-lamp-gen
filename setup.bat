@@ -3,11 +3,11 @@ chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 cd /d "%~dp0"
-title Literate Lamp - Setup Lingkungan dan Python
+title Literate Lamp - Setup Otomatis
 
 echo.
 echo ============================================================
-echo   Literate Lamp - Setup Lingkungan dan Dependensi Otomatis
+echo   Literate Lamp - Setup Otomatis Semua Dependensi
 echo ============================================================
 echo.
 
@@ -23,6 +23,12 @@ if exist "%ProgramFiles(x86)%\nodejs" (
 if exist "%LOCALAPPDATA%\Programs\nodejs" (
     set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
 )
+if exist "%ProgramFiles%\gs\bin" (
+    set "PATH=%ProgramFiles%\gs\bin;!PATH!"
+)
+for /d %%G in ("%ProgramFiles%\gs\gs*") do (
+    if exist "%%G\bin\gswin64c.exe" set "PATH=%%G\bin;!PATH!"
+)
 
 set "HAS_WINGET=0"
 where winget >nul 2>&1
@@ -30,14 +36,14 @@ if !errorlevel! equ 0 (
     set "HAS_WINGET=1"
     echo [OK] Windows Package Manager [winget] terdeteksi.
 ) else (
-    echo [i] winget tidak ditemukan. Sistem akan menggunakan pengecekan manual jika perlu.
+    echo [i] winget tidak ditemukan. Beberapa komponen mungkin perlu diinstal manual.
 )
 echo.
 
 REM ------------------------------------------------------------
 REM 1. CHECK AND DETECT PYTHON
 REM ------------------------------------------------------------
-echo [1/6] Memeriksa instalasi Python...
+echo [1/7] Memeriksa instalasi Python...
 set "PYTHON_EXEC="
 
 REM Uji perintah 'python' bawaan PATH
@@ -86,7 +92,7 @@ if "!HAS_WINGET!"=="1" (
     echo     CATATAN: Jika muncul pop-up Windows UAC izin administrator, silakan klik 'YES' / 'YA'.
     winget install Python.Python.3.12 --override "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1" --accept-package-agreements --accept-source-agreements --disable-interactivity
     call :refresh_path
-    
+
     python -c "import sys" >nul 2>&1
     if !errorlevel! equ 0 (
         set "PYTHON_EXEC=python"
@@ -105,7 +111,7 @@ if "!HAS_WINGET!"=="1" (
     )
     echo.
     echo [!] Python berhasil dipasang, tetapi Windows membutuhkan jendela baru untuk memuat PATH.
-    echo     Silakan tutup jendela ini lalu klik ganda setup-python.bat lagi.
+    echo     Silakan tutup jendela ini lalu klik ganda setup.bat lagi.
     echo.
     pause
     exit /b 0
@@ -120,7 +126,7 @@ echo Panduan instalasi cepat:
 echo 1. Buka browser: https://www.python.org/downloads/
 echo 2. Download installer Python [disarankan versi 3.11 atau 3.12]
 echo 3. SANGAT PENTING: Centang kotak 'Add Python to PATH' di layar awal installer!
-echo 4. Jalankan kembali setup-python.bat setelah instalasi selesai.
+echo 4. Jalankan kembali setup.bat setelah instalasi selesai.
 echo.
 pause
 exit /b 1
@@ -139,7 +145,7 @@ echo.
 REM ------------------------------------------------------------
 REM 2. CHECK AND DETECT NODE.JS
 REM ------------------------------------------------------------
-echo [2/6] Memeriksa Node.js...
+echo [2/7] Memeriksa Node.js...
 node -v >nul 2>&1
 if !errorlevel! equ 0 goto :nodejs_detected
 
@@ -162,19 +168,19 @@ if "!HAS_WINGET!"=="1" (
     echo.
     winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --disable-interactivity
     call :refresh_path
-    
+
     node -v >nul 2>&1
     if !errorlevel! equ 0 goto :nodejs_detected
-    
+
     if exist "%ProgramFiles%\nodejs\node.exe" (
         set "PATH=%ProgramFiles%\nodejs;!PATH!"
         goto :nodejs_detected
     )
-    
+
     echo.
     echo [i] Node.js telah selesai diinstal via winget.
     echo     Terminal perlu ditutup dan dibuka kembali agar PATH Node.js aktif.
-    echo     Silakan tutup jendela ini, lalu jalankan setup-python.bat sekali lagi.
+    echo     Silakan tutup jendela ini, lalu jalankan setup.bat sekali lagi.
     echo.
     pause
     exit /b 0
@@ -188,7 +194,7 @@ echo.
 echo Silakan download dan pasang Node.js LTS secara manual:
 echo 1. Kunjungi: https://nodejs.org/
 echo 2. Download dan install versi LTS [klik Next sampai selesai].
-echo 3. Setelah selesai, jalankan kembali setup-python.bat.
+echo 3. Setelah selesai, jalankan kembali setup.bat.
 echo.
 pause
 exit /b 1
@@ -199,16 +205,16 @@ node --version
 echo.
 
 REM ------------------------------------------------------------
-REM 3. CHECK FFMPEG (OPTIONAL / AUTO-INSTALL)
+REM 3. CHECK FFMPEG (AUTO-INSTALL VIA WINGET)
 REM ------------------------------------------------------------
-echo [3/6] Memeriksa FFmpeg...
+echo [3/7] Memeriksa FFmpeg [diperlukan untuk analisis video]...
 ffmpeg -version >nul 2>&1
 if !errorlevel! equ 0 (
     echo [OK] FFmpeg siap.
     goto :ffmpeg_done
 )
 
-echo [i] FFmpeg belum terpasang (opsional untuk ekstraksi metadata frame video).
+echo [i] FFmpeg belum terpasang.
 if "!HAS_WINGET!"=="1" (
     echo     Mencoba memasang FFmpeg via winget...
     winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements --disable-interactivity >nul 2>&1
@@ -217,19 +223,78 @@ if "!HAS_WINGET!"=="1" (
     if !errorlevel! equ 0 (
         echo [OK] FFmpeg berhasil dipasang.
     ) else (
-        echo [i] FFmpeg akan aktif pada sesi berikutnya.
+        echo [i] FFmpeg akan aktif setelah jendela ini ditutup dan dibuka kembali.
+        echo [i] Atau download manual: https://ffmpeg.org/download.html
     )
 ) else (
-    echo [i] FFmpeg dapat dipasang manual jika diperlukan: https://ffmpeg.org/download.html
+    echo [i] FFmpeg dapat dipasang manual: https://ffmpeg.org/download.html
 )
 
 :ffmpeg_done
 echo.
 
 REM ------------------------------------------------------------
-REM 4. CREATE / VALIDATE VIRTUAL ENVIRONMENT [VENV]
+REM 4. CHECK GHOSTSCRIPT (AUTO-INSTALL VIA WINGET)
+REM    Diperlukan untuk membaca file .ai dan .eps
 REM ------------------------------------------------------------
-echo [4/6] Menyiapkan Python Virtual Environment [venv]...
+echo [4/7] Memeriksa Ghostscript [diperlukan untuk file .ai dan .eps]...
+set "GS_OK=0"
+
+gswin64c --version >nul 2>&1
+if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
+gswin32c --version >nul 2>&1
+if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
+gs --version >nul 2>&1
+if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
+
+REM Cari di lokasi default Ghostscript
+for /d %%G in ("%ProgramFiles%\gs\gs*") do (
+    if exist "%%G\bin\gswin64c.exe" (
+        set "PATH=%%G\bin;!PATH!"
+        set "GS_OK=1"
+        goto :gs_found
+    )
+)
+
+:gs_found
+if "!GS_OK!"=="1" (
+    echo [OK] Ghostscript siap.
+    goto :gs_done
+)
+
+echo [i] Ghostscript belum terpasang.
+if "!HAS_WINGET!"=="1" (
+    echo     Mencoba memasang Ghostscript via winget...
+    echo     CATATAN: Jika muncul pop-up UAC, klik 'YES' / 'YA'.
+    winget install ArtifexSoftware.GhostScript --accept-package-agreements --accept-source-agreements --disable-interactivity
+    call :refresh_path
+
+    REM Tambahkan path GS ke PATH session ini
+    for /d %%G in ("%ProgramFiles%\gs\gs*") do (
+        if exist "%%G\bin\gswin64c.exe" (
+            set "PATH=%%G\bin;!PATH!"
+        )
+    )
+
+    gswin64c --version >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo [OK] Ghostscript berhasil dipasang.
+    ) else (
+        echo [i] Ghostscript akan aktif setelah restart atau membuka jendela baru.
+        echo [i] Atau download manual: https://ghostscript.com/releases/gsdnld.html
+    )
+) else (
+    echo [i] Ghostscript dapat dipasang manual dari: https://ghostscript.com/releases/gsdnld.html
+    echo [i] File .ai dan .eps tidak akan bisa diproses tanpa Ghostscript.
+)
+
+:gs_done
+echo.
+
+REM ------------------------------------------------------------
+REM 5. CREATE / VALIDATE VIRTUAL ENVIRONMENT [VENV]
+REM ------------------------------------------------------------
+echo [5/7] Menyiapkan Python Virtual Environment [venv]...
 set "NEED_NEW_VENV=0"
 
 if not exist "venv" goto :create_new_venv
@@ -244,7 +309,7 @@ if !errorlevel! equ 0 (
 )
 
 :corrupt_venv
-echo [!] Virtual environment lama tidak kompatibel dengan laptop ini [hasil salin dari laptop lain].
+echo [!] Virtual environment lama tidak kompatibel [mungkin hasil salin dari laptop lain].
 echo     Sedang membersihkan venv lama...
 set "NEED_NEW_VENV=1"
 
@@ -254,7 +319,7 @@ if exist "venv" (
 )
 
 echo.
-echo [INFO] Sedang membuat Virtual Environment [venv] baru khusus laptop ini...
+echo [INFO] Sedang membuat Virtual Environment [venv] baru...
 echo        [Proses ini memakan waktu sekitar 15-30 detik, mohon tunggu]...
 echo.
 
@@ -299,9 +364,9 @@ echo [OK] Virtual environment aktif.
 echo.
 
 REM ------------------------------------------------------------
-REM 5. INSTALL BACKEND DEPENDENCIES
+REM 6. INSTALL BACKEND DEPENDENCIES
 REM ------------------------------------------------------------
-echo [5/6] Memasang dependensi Python backend...
+echo [6/7] Memasang dependensi Python backend...
 echo [INFO] Mengunduh dan memasang paket backend [FastAPI, Uvicorn, HTTPX]...
 echo        [Proses ini menggunakan koneksi internet, mohon tunggu]...
 echo.
@@ -322,9 +387,9 @@ echo [OK] Paket Python backend terpasang lengkap.
 echo.
 
 REM ------------------------------------------------------------
-REM 6. INSTALL FRONTEND DEPENDENCIES
+REM 7. INSTALL FRONTEND DEPENDENCIES
 REM ------------------------------------------------------------
-echo [6/6] Memeriksa dependensi antarmuka frontend...
+echo [7/7] Memeriksa dependensi antarmuka frontend...
 if not exist "frontend" (
     echo [ERROR] Folder frontend tidak ditemukan!
     pause
@@ -355,7 +420,7 @@ cd ..
 echo.
 
 REM ------------------------------------------------------------
-REM 7. CREATE .ENV IF NOT EXISTS
+REM CREATE .ENV IF NOT EXISTS
 REM ------------------------------------------------------------
 if not exist ".env" (
     echo Menyiapkan file konfigurasi .env...
@@ -377,6 +442,8 @@ echo ============================================================
 echo.
 echo   - Python             : Siap
 echo   - Node.js            : Siap
+echo   - FFmpeg             : Siap [analisis video]
+echo   - Ghostscript        : Siap [analisis .ai dan .eps]
 echo   - Virtual Environment: Aktif [venv khusus laptop ini]
 echo   - Backend Packages   : Terinstall
 echo   - Frontend Packages  : Terinstall
@@ -394,4 +461,8 @@ REM ============================================================
 if exist "%ProgramFiles%\nodejs" set "PATH=%ProgramFiles%\nodejs;!PATH!"
 if exist "%ProgramFiles(x86)%\nodejs" set "PATH=%ProgramFiles(x86)%\nodejs;!PATH!"
 if exist "%LOCALAPPDATA%\Programs\nodejs" set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
+for /d %%G in ("%ProgramFiles%\gs\gs*") do (
+    if exist "%%G\bin\gswin64c.exe" set "PATH=%%G\bin;!PATH!"
+)
 exit /b 0
+

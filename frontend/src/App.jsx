@@ -34,6 +34,7 @@ export default function App() {
   const [isDragging, setIsDragging]     = useState(false);
   const [backendOk, setBackendOk]       = useState(null);
   const [ffmpegOk, setFfmpegOk]         = useState(null);
+  const [gsOk, setGsOk]                 = useState(null);
   const [filter, setFilter]             = useState('all');
   const [sort, setSort]                 = useState('upload');
   const [selected, setSelected]         = useState([]);
@@ -74,6 +75,7 @@ export default function App() {
         const h = await healthCheck();
         setBackendOk(true);
         setFfmpegOk(h.data.ffmpeg);
+        setGsOk(h.data.ghostscript);
         setCurrentModel(h.data.model || 'gemini-3.5-flash-lite');
         setPlatforms(h.data.platforms || ['shutterstock']);
         setKwCount(h.data.keyword_count || 45);
@@ -237,6 +239,7 @@ export default function App() {
                 <Wifi size={12} style={{ color:'var(--success)' }}/>
                 <span style={{ color:'var(--success)' }}>Backend OK</span>
                 {ffmpegOk === false && <span style={{ color:'var(--warning)', marginLeft:6 }}>⚠ ffmpeg missing</span>}
+                {gsOk === false && <span style={{ color:'var(--warning)', marginLeft:6 }}>⚠ Ghostscript missing (.ai/.eps)</span>}
               </>
             : <><WifiOff size={12} style={{ color:'var(--error)' }}/><span style={{ color:'var(--error)' }}>Backend Down</span></>}
         </div>
@@ -339,12 +342,12 @@ export default function App() {
             cursor:'pointer', background: isDragging ? 'var(--accent-light)' : 'var(--bg-surface)',
             transition:'all 0.15s', transform: isDragging ? 'scale(0.995)' : 'scale(1)'
           }}>
-          <input type="file" id="file-input" multiple accept="image/*,video/*" className="hidden" onChange={e => handleFiles(e.target.files)}/>
+          <input type="file" id="file-input" multiple accept="image/*,video/*,.ai,.eps,application/postscript,application/illustrator" className="hidden" onChange={e => handleFiles(e.target.files)}/>
           <UploadCloud size={32} style={{ color: isDragging ? 'var(--accent)' : 'var(--text-tertiary)', marginBottom:8 }}/>
           <p style={{ fontSize:14, fontWeight:600, color:'var(--text-secondary)', marginBottom:4 }}>
             {isDragging ? 'Drop files here' : 'Drag images & videos here'}
           </p>
-          <p style={{ fontSize:12, color:'var(--text-tertiary)' }}>or click to browse · JPG, PNG, MP4, MOV and more</p>
+          <p style={{ fontSize:12, color:'var(--text-tertiary)' }}>or click to browse · JPG, PNG, MP4, MOV, AI, EPS and more</p>
         </div>
 
         {/* Filter bar */}

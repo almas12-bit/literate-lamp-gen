@@ -38,9 +38,9 @@ if exist "venv\Scripts\python.exe" (
 
 if "!VENV_READY!"=="0" (
     echo [i] Virtual environment [venv] belum siap atau dipindahkan dari laptop lain.
-    echo [i] Menjalankan setup-python.bat secara otomatis...
+    echo [i] Menjalankan setup.bat secara otomatis...
     echo.
-    call setup-python.bat
+    call setup.bat
     if !errorlevel! neq 0 (
         echo.
         echo ============================================================
@@ -56,7 +56,7 @@ if not exist "venv\Scripts\activate.bat" (
     echo.
     echo ============================================================
     echo [ERROR] Virtual environment belum berhasil dibuat.
-    echo         Silakan klik ganda file setup-python.bat secara langsung.
+    echo         Silakan klik ganda file setup.bat secara langsung.
     echo ============================================================
     echo.
     pause
@@ -96,8 +96,8 @@ REM ------------------------------------------------------------
 node -v >nul 2>&1
 if !errorlevel! neq 0 (
     echo [!] Node.js belum terdeteksi di sistem.
-    echo [!] Menjalankan setup-python.bat untuk instalasi...
-    call setup-python.bat
+    echo [!] Menjalankan setup.bat untuk instalasi...
+    call setup.bat
     if !errorlevel! neq 0 (
         echo.
         echo ============================================================

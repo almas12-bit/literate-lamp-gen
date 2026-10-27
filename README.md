@@ -2,12 +2,13 @@
 Auto-generate metadata (description, keywords, categories) using Google Gemini AI.
 
 ## Features
-- Image & video support
+- Image, video, **vector (.ai, .eps)** support
 - Multiple Gemini models (2.5 Pro, 2.5 Flash, 2.5 Flash Lite, 2.0 Flash, 2.0 Flash Lite)
 - Multi API key with auto-rolling on rate limit
 - Start / Pause / Stop queue controls
 - Export CSV for bulk upload
 - FFmpeg-based video frame extraction
+- Ghostscript-based .ai / .eps vector conversion
 
 ---
 
@@ -15,13 +16,16 @@ Auto-generate metadata (description, keywords, categories) using Google Gemini A
 
 - Python 3.10+
 - Node.js 18+
-- ffmpeg (for video support)
+- FFmpeg (for video support)
+- Ghostscript (for .ai and .eps support)
 
-### Install ffmpeg
+> **Windows users:** All dependencies are installed automatically by `setup.bat`
+
+### Install FFmpeg (manual)
 
 **Windows:**
 ```
-winget install ffmpeg
+winget install Gyan.FFmpeg
 ```
 or download from https://ffmpeg.org/download.html and add to PATH
 
@@ -35,33 +39,43 @@ brew install ffmpeg
 sudo apt install ffmpeg
 ```
 
+### Install Ghostscript (manual)
+
+**Windows:**
+```
+winget install ArtifexSoftware.GhostScript
+```
+or download from https://ghostscript.com/releases/gsdnld.html and add to PATH
+
+**macOS:**
+```
+brew install ghostscript
+```
+
+**Ubuntu/Debian:**
+```
+sudo apt install ghostscript
+```
+
 ---
 
 ## Setup & Run
-1. Run setup-python
-2. Run start
-   
-### 1. Python
 
-**Windows:**
-```
-setup-python.bat
-```
+### Windows (Otomatis)
 
-**Ubuntu/Debian:**
+1. Klik ganda **`setup.bat`** — menginstall semua dependensi secara otomatis
+2. Klik ganda **`start.bat`** — menjalankan aplikasi
+
 ```
-setup-python.sh
+setup.bat   ← jalankan sekali untuk setup
+start.bat   ← jalankan setiap kali ingin membuka aplikasi
 ```
 
-### 2. Start
+### Linux / macOS
 
-**Windows:**
-```
-start.bat
-```
-**Ubuntu/Debian:**
-```
-start.sh
+```bash
+bash setup-python.sh
+bash start.sh
 ```
 
 Frontend runs at: http://localhost:5173
@@ -72,11 +86,11 @@ Backend runs at: http://localhost:8000
 1. Open http://localhost:5173
 2. Click **API KEYS** → paste your Gemini API keys (one per line) → **SAVE KEYS**
 3. Select a **Gemini model** from the dropdown
-4. Drag & drop images/videos onto the drop zone
+4. Drag & drop images / videos / .ai / .eps onto the drop zone
 5. Click **START** to begin analysis
 6. Edit description/keywords/categories if needed
 7. Click **EXPORT CSV** to download
-8. When there are any errors of shutterstock csv, just select none at shutterstock categories 
+8. When there are any errors of shutterstock csv, just select none at shutterstock categories
 
 ---
 

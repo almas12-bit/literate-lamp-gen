@@ -34,6 +34,7 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
   const cfg = STATUS_CFG[job.status] || STATUS_CFG.pending;
   const kwCount = job.keywords ? job.keywords.split(',').filter(k => k.trim()).length : 0;
   const isVideo = job.media_type === 'video';
+  const isVector = job.media_type === 'vector';
   const isDone = job.status === 'done';
   const isError = job.status === 'error';
   const showSS = activePlatforms.includes('shutterstock');
@@ -49,11 +50,12 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
 
   // Create stable image URL using useMemo to prevent memory leak and flickering on every render
   const imageUrl = useMemo(() => {
-    if (!isVideo && job.fileObj) {
+    // Vector files (.ai/.eps) cannot be previewed directly in the browser
+    if (!isVideo && !isVector && job.fileObj) {
       return URL.createObjectURL(job.fileObj);
     }
     return null;
-  }, [job.fileObj, isVideo]);
+  }, [job.fileObj, isVideo, isVector]);
 
   // Cleanup object URLs when component unmounts or fileObj changes
   useEffect(() => {
@@ -131,9 +133,9 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
         </span>
         <span style={{ fontSize:12, color:'var(--text-secondary)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{job.filename}</span>
         <span style={{ fontSize:10, fontWeight:700, padding:'2px 7px', borderRadius:4,
-          background: isVideo ? 'rgba(123,45,139,0.1)' : 'var(--accent-light)',
-          color: isVideo ? '#7b2d8b' : 'var(--accent)' }}>
-          {isVideo ? 'VIDEO' : 'IMAGE'}
+          background: isVideo ? 'rgba(123,45,139,0.1)' : isVector ? 'rgba(20,120,80,0.1)' : 'var(--accent-light)',
+          color: isVideo ? '#7b2d8b' : isVector ? '#147850' : 'var(--accent)' }}>
+          {isVideo ? 'VIDEO' : isVector ? 'VECTOR' : 'IMAGE'}
         </span>
         {isError && (
           <button className="btn btn-warning-soft btn-xs" onClick={handleRetry} style={{ flexShrink:0 }}>
@@ -181,6 +183,11 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
                   <div title="Preview tidak tersedia" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🎬</div>
                 )}
               </>
+            ) : isVector ? (
+              <div title="Vector file (.ai/.eps)" style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
+                <span style={{ fontSize:18 }}>🖊️</span>
+                <span style={{ fontSize:8, fontWeight:700, color:'#147850', letterSpacing:'0.05em' }}>{(job.filename||\'\').split(\'.\'  ).pop().toUpperCase()}</span>
+              </div>
             ) : effectiveImageUrl ? (
               <img src={effectiveImageUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
             ) : (

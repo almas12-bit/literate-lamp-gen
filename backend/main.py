@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from config import GEMINI_MODELS, VIDEO_FRAME_COUNT, DEFAULT_KEYWORD_COUNT, MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, AS_CATEGORIES
 from gemini_service import key_manager, analyze_image, analyze_video_frames, sanitize_title, sanitize_keywords
 from video_service import extract_frames, check_ffmpeg
+from vector_service import convert_vector_to_png, check_ghostscript
 from queue_manager import queue_manager, JobStatus
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -139,6 +140,16 @@ async def process_job(job_id: str, job: dict) -> dict:
         if not frames:
             raise Exception("Failed to extract video frames. Is ffmpeg installed?")
         ai_data = await analyze_video_frames(model, frames, platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
+    elif media_type == "vector":
+        file_ext = os.path.splitext(job.get("filename", ".eps"))[1].lower() or ".eps"
+        png_bytes = await convert_vector_to_png(file_bytes, ext=file_ext)
+        if not png_bytes:
+            raise Exception(
+                "Failed to convert vector file to image. "
+                "Please install Ghostscript from https://ghostscript.com/releases/gsdnld.html "
+                "and ensure it is added to your system PATH."
+            )
+        ai_data = await analyze_image(model, png_bytes, "image/png", platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
     else:
         ai_data = await analyze_image(model, file_bytes, mime_type, platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
 
@@ -160,9 +171,11 @@ queue_manager.set_processor(process_job)
 @app.get("/health")
 async def health():
     ffmpeg_ok = await check_ffmpeg()
+    gs_ok = await check_ghostscript()
     return {
         "status": "ok",
         "ffmpeg": ffmpeg_ok,
+        "ghostscript": gs_ok,
         "keys_loaded": len(key_manager.keys),
         "model": selected_model,
         "platforms": active_platforms,
@@ -263,7 +276,16 @@ async def upload_files(files: List[UploadFile] = File(...)):
         file_bytes = await file.read()
         with open(dest_path, "wb") as f:
             f.write(file_bytes)
-        media_type = "video" if (file.content_type or "").startswith("video/") else "image"
+        fname_lower = (file.filename or "").lower()
+        ct = (file.content_type or "").lower()
+        if ct.startswith("video/") or any(fname_lower.endswith(e) for e in (".mp4", ".mov", ".avi", ".mkv", ".webm")):
+            media_type = "video"
+        elif fname_lower.endswith(".ai") or fname_lower.endswith(".eps") or \
+                ct in ("application/postscript", "image/x-eps", "application/illustrator",
+                        "application/eps", "image/eps"):
+            media_type = "vector"
+        else:
+            media_type = "image"
         queue_manager.add_job(job_id, {
             "filename": file.filename,
             "mime_type": file.content_type,
