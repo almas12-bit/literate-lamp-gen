@@ -186,7 +186,7 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
             ) : isVector ? (
               <div title="Vector file (.ai/.eps)" style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
                 <span style={{ fontSize:18 }}>🖊️</span>
-                <span style={{ fontSize:8, fontWeight:700, color:'#147850', letterSpacing:'0.05em' }}>{(job.filename||\'\').split(\'.\'  ).pop().toUpperCase()}</span>
+                <span style={{ fontSize:8, fontWeight:700, color:'#147850', letterSpacing:'0.05em' }}>{(job.filename || '').split('.').pop().toUpperCase()}</span>
               </div>
             ) : effectiveImageUrl ? (
               <img src={effectiveImageUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
