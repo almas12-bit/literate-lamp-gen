@@ -13,7 +13,7 @@ echo ============================================================
 echo.
 
 REM ------------------------------------------------------------
-REM 1. AUTO-DETECT AND PREPEND STANDARD PATHS (NODE.JS)
+REM 1. AUTO-DETECT AND PREPEND STANDARD PATHS (NODE.JS + GHOSTSCRIPT)
 REM ------------------------------------------------------------
 if exist "%ProgramFiles%\nodejs" (
     set "PATH=%ProgramFiles%\nodejs;!PATH!"
@@ -23,6 +23,18 @@ if exist "%ProgramFiles(x86)%\nodejs" (
 )
 if exist "%LOCALAPPDATA%\Programs\nodejs" (
     set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
+)
+
+REM Ghostscript / GhostTrap — cari semua versi yang terinstall di lokasi default
+if exist "%ProgramFiles%\GhostTrap\bin" set "PATH=%ProgramFiles%\GhostTrap\bin;!PATH!"
+if exist "%ProgramFiles(x86)%\GhostTrap\bin" set "PATH=%ProgramFiles(x86)%\GhostTrap\bin;!PATH!"
+for /d %%G in ("%ProgramFiles%\gs\gs*") do (
+    if exist "%%G\bin\gswin64c.exe" set "PATH=%%G\bin;!PATH!"
+    if exist "%%G\bin\gsc.exe" set "PATH=%%G\bin;!PATH!"
+)
+for /d %%G in ("%ProgramFiles(x86)%\gs\gs*") do (
+    if exist "%%G\bin\gswin32c.exe" set "PATH=%%G\bin;!PATH!"
+    if exist "%%G\bin\gsc.exe" set "PATH=%%G\bin;!PATH!"
 )
 
 REM ------------------------------------------------------------

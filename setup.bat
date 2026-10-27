@@ -23,11 +23,19 @@ if exist "%ProgramFiles(x86)%\nodejs" (
 if exist "%LOCALAPPDATA%\Programs\nodejs" (
     set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
 )
-if exist "%ProgramFiles%\gs\bin" (
-    set "PATH=%ProgramFiles%\gs\bin;!PATH!"
+if exist "%ProgramFiles%\GhostTrap\bin" (
+    set "PATH=%ProgramFiles%\GhostTrap\bin;!PATH!"
+)
+if exist "%ProgramFiles(x86)\GhostTrap\bin" (
+    set "PATH=%ProgramFiles(x86)\GhostTrap\bin;!PATH!"
 )
 for /d %%G in ("%ProgramFiles%\gs\gs*") do (
     if exist "%%G\bin\gswin64c.exe" set "PATH=%%G\bin;!PATH!"
+    if exist "%%G\bin\gsc.exe" set "PATH=%%G\bin;!PATH!"
+)
+for /d %%G in ("%ProgramFiles(x86)%\gs\gs*") do (
+    if exist "%%G\bin\gswin32c.exe" set "PATH=%%G\bin;!PATH!"
+    if exist "%%G\bin\gsc.exe" set "PATH=%%G\bin;!PATH!"
 )
 
 set "HAS_WINGET=0"
@@ -234,22 +242,46 @@ if "!HAS_WINGET!"=="1" (
 echo.
 
 REM ------------------------------------------------------------
-REM 4. CHECK GHOSTSCRIPT (AUTO-INSTALL VIA WINGET)
+REM 4. CHECK GHOSTSCRIPT (AUTO-INSTALL VIA WINGET / OFFICIAL)
 REM    Diperlukan untuk membaca file .ai dan .eps
 REM ------------------------------------------------------------
 echo [4/7] Memeriksa Ghostscript [diperlukan untuk file .ai dan .eps]...
 set "GS_OK=0"
 
-gswin64c --version >nul 2>&1
+gsc -v >nul 2>&1
 if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
-gswin32c --version >nul 2>&1
+gswin64c -v >nul 2>&1
 if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
-gs --version >nul 2>&1
+gswin32c -v >nul 2>&1
+if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
+gs -v >nul 2>&1
 if !errorlevel! equ 0 ( set "GS_OK=1" & goto :gs_found )
 
-REM Cari di lokasi default Ghostscript
+REM Cari di lokasi default GhostTrap dan Ghostscript
+if exist "%ProgramFiles%\GhostTrap\bin\gsc.exe" (
+    set "PATH=%ProgramFiles%\GhostTrap\bin;!PATH!"
+    set "GS_OK=1"
+    goto :gs_found
+)
+if exist "%ProgramFiles(x86)%\GhostTrap\bin\gsc.exe" (
+    set "PATH=%ProgramFiles(x86)%\GhostTrap\bin;!PATH!"
+    set "GS_OK=1"
+    goto :gs_found
+)
 for /d %%G in ("%ProgramFiles%\gs\gs*") do (
     if exist "%%G\bin\gswin64c.exe" (
+        set "PATH=%%G\bin;!PATH!"
+        set "GS_OK=1"
+        goto :gs_found
+    )
+    if exist "%%G\bin\gsc.exe" (
+        set "PATH=%%G\bin;!PATH!"
+        set "GS_OK=1"
+        goto :gs_found
+    )
+)
+for /d %%G in ("%ProgramFiles(x86)%\gs\gs*") do (
+    if exist "%%G\bin\gswin32c.exe" (
         set "PATH=%%G\bin;!PATH!"
         set "GS_OK=1"
         goto :gs_found
@@ -264,28 +296,31 @@ if "!GS_OK!"=="1" (
 
 echo [i] Ghostscript belum terpasang.
 if "!HAS_WINGET!"=="1" (
-    echo     Mencoba memasang Ghostscript via winget...
-    echo     CATATAN: Jika muncul pop-up UAC, klik 'YES' / 'YA'.
-    winget install ArtifexSoftware.GhostScript --accept-package-agreements --accept-source-agreements --disable-interactivity
+    echo [INFO] Mengunduh dan memasang Ghostscript otomatis via winget...
+    echo        [Proses ini memakan waktu sekitar 1 menit, mohon tunggu]...
+    winget install PaperCutSoftware.GhostTrap --accept-package-agreements --accept-source-agreements --disable-interactivity >nul 2>&1
     call :refresh_path
 
-    REM Tambahkan path GS ke PATH session ini
-    for /d %%G in ("%ProgramFiles%\gs\gs*") do (
-        if exist "%%G\bin\gswin64c.exe" (
-            set "PATH=%%G\bin;!PATH!"
-        )
+    if exist "%ProgramFiles%\GhostTrap\bin\gsc.exe" (
+        set "PATH=%ProgramFiles%\GhostTrap\bin;!PATH!"
+        set "GS_OK=1"
     )
+    if exist "%ProgramFiles(x86)%\GhostTrap\bin\gsc.exe" (
+        set "PATH=%ProgramFiles(x86)%\GhostTrap\bin;!PATH!"
+        set "GS_OK=1"
+    )
+    gsc -v >nul 2>&1
+    if !errorlevel! equ 0 set "GS_OK=1"
+)
 
-    gswin64c --version >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo [OK] Ghostscript berhasil dipasang.
-    ) else (
-        echo [i] Ghostscript akan aktif setelah restart atau membuka jendela baru.
-        echo [i] Atau download manual: https://ghostscript.com/releases/gsdnld.html
-    )
+if "!GS_OK!"=="1" (
+    echo [OK] Ghostscript berhasil dipasang secara otomatis.
 ) else (
-    echo [i] Ghostscript dapat dipasang manual dari: https://ghostscript.com/releases/gsdnld.html
-    echo [i] File .ai dan .eps tidak akan bisa diproses tanpa Ghostscript.
+    echo.
+    echo [!] Ghostscript belum terpasang otomatis.
+    echo     Anda dapat mengunduhnya secara manual jika memerlukan file .ai dan .eps:
+    echo     https://ghostscript.com/releases/gsdnld.html
+    echo.
 )
 
 :gs_done
@@ -443,7 +478,35 @@ echo.
 echo   - Python             : Siap
 echo   - Node.js            : Siap
 echo   - FFmpeg             : Siap [analisis video]
-echo   - Ghostscript        : Siap [analisis .ai dan .eps]
+
+REM Cek status GS final untuk summary yang akurat
+set "GS_FINAL=0"
+gsc -v >nul 2>&1
+if !errorlevel! equ 0 set "GS_FINAL=1"
+gswin64c -v >nul 2>&1
+if !errorlevel! equ 0 set "GS_FINAL=1"
+gswin32c -v >nul 2>&1
+if !errorlevel! equ 0 set "GS_FINAL=1"
+gs -v >nul 2>&1
+if !errorlevel! equ 0 set "GS_FINAL=1"
+if exist "%ProgramFiles%\GhostTrap\bin\gsc.exe" set "GS_FINAL=1"
+if exist "%ProgramFiles(x86)%\GhostTrap\bin\gsc.exe" set "GS_FINAL=1"
+for /d %%G in ("%ProgramFiles%\gs\gs*") do (
+    if exist "%%G\bin\gswin64c.exe" set "GS_FINAL=1"
+    if exist "%%G\bin\gsc.exe" set "GS_FINAL=1"
+)
+for /d %%G in ("%ProgramFiles(x86)%\gs\gs*") do (
+    if exist "%%G\bin\gswin32c.exe" set "GS_FINAL=1"
+    if exist "%%G\bin\gsc.exe" set "GS_FINAL=1"
+)
+
+if "!GS_FINAL!"=="1" (
+    echo   - Ghostscript        : Siap [analisis .ai dan .eps]
+) else (
+    echo   - Ghostscript        : BELUM SIAP - install manual: https://ghostscript.com/releases/gsdnld.html
+    echo                          File .ai dan .eps tidak bisa diproses sampai Ghostscript terinstall.
+)
+
 echo   - Virtual Environment: Aktif [venv khusus laptop ini]
 echo   - Backend Packages   : Terinstall
 echo   - Frontend Packages  : Terinstall
@@ -461,8 +524,15 @@ REM ============================================================
 if exist "%ProgramFiles%\nodejs" set "PATH=%ProgramFiles%\nodejs;!PATH!"
 if exist "%ProgramFiles(x86)%\nodejs" set "PATH=%ProgramFiles(x86)%\nodejs;!PATH!"
 if exist "%LOCALAPPDATA%\Programs\nodejs" set "PATH=%LOCALAPPDATA%\Programs\nodejs;!PATH!"
+if exist "%ProgramFiles%\GhostTrap\bin" set "PATH=%ProgramFiles%\GhostTrap\bin;!PATH!"
+if exist "%ProgramFiles(x86)\GhostTrap\bin" set "PATH=%ProgramFiles(x86)\GhostTrap\bin;!PATH!"
 for /d %%G in ("%ProgramFiles%\gs\gs*") do (
     if exist "%%G\bin\gswin64c.exe" set "PATH=%%G\bin;!PATH!"
+    if exist "%%G\bin\gsc.exe" set "PATH=%%G\bin;!PATH!"
+)
+for /d %%G in ("%ProgramFiles(x86)%\gs\gs*") do (
+    if exist "%%G\bin\gswin32c.exe" set "PATH=%%G\bin;!PATH!"
+    if exist "%%G\bin\gsc.exe" set "PATH=%%G\bin;!PATH!"
 )
 exit /b 0
 

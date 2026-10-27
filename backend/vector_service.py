@@ -2,6 +2,7 @@ import asyncio
 import subprocess
 import tempfile
 import os
+import glob
 import shutil
 import logging
 from typing import Optional
@@ -11,16 +12,47 @@ logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=4)
 
-# Common Ghostscript executable names to probe
-_GS_CANDIDATES = ["gs", "gswin64c", "gswin32c", "gsc"]
+# Common Ghostscript executable names to probe via PATH
+_GS_CANDIDATES = ["gsc", "gswin64c", "gswin32c", "gs"]
+
+# Common Windows installation directories for Ghostscript / GhostTrap
+_GS_WIN_DIRS = [
+    r"C:\Program Files\GhostTrap\bin",
+    r"C:\Program Files (x86)\GhostTrap\bin",
+    r"C:\Program Files\gs",
+    r"C:\Program Files (x86)\gs",
+]
 
 
 def find_ghostscript() -> Optional[str]:
-    """Find Ghostscript executable on PATH. Returns path or None."""
+    """
+    Find Ghostscript executable.
+    1. Check PATH first (gsc, gswin64c, gswin32c, gs)
+    2. Fall back to scanning common Windows install directories (GhostTrap, gs)
+    """
+    # 1. Check PATH
     for name in _GS_CANDIDATES:
         path = shutil.which(name)
         if path:
             return path
+
+    # 2. Check direct bin folders (e.g. GhostTrap\bin)
+    for base in [r"C:\Program Files\GhostTrap\bin", r"C:\Program Files (x86)\GhostTrap\bin"]:
+        for exe in ("gsc.exe", "gswin64c.exe", "gswin32c.exe", "gs.exe"):
+            candidate = os.path.join(base, exe)
+            if os.path.isfile(candidate):
+                return candidate
+
+    # 3. Scan versioned dirs (e.g. C:\Program Files\gs\gs10.04.0\bin\gswin64c.exe)
+    for base in [r"C:\Program Files\gs", r"C:\Program Files (x86)\gs"]:
+        if not os.path.isdir(base):
+            continue
+        for versioned in sorted(glob.glob(os.path.join(base, "gs*")), reverse=True):
+            for exe in ("gsc.exe", "gswin64c.exe", "gswin32c.exe", "gs.exe"):
+                candidate = os.path.join(versioned, "bin", exe)
+                if os.path.isfile(candidate):
+                    return candidate
+
     return None
 
 
