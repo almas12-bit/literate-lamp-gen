@@ -154,10 +154,22 @@ async def process_job(job_id: str, job: dict) -> dict:
         ai_data = await analyze_image(model, file_bytes, mime_type, platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
 
     raw_title = ai_data.get("title", "")
+    raw_magnific_title = ai_data.get("magnific_title", "")
     raw_keywords = ai_data.get("keywords", "")
 
+    has_standard = ("shutterstock" in platforms) or ("adobe_stock" in platforms)
+    has_magnific = "magnific" in platforms
+
+    if has_magnific and not has_standard:
+        magnific_title = sanitize_title(raw_magnific_title or raw_title, max_chars=100, forbidden_words=forbidden_w)
+        std_title = magnific_title
+    else:
+        std_title = sanitize_title(raw_title or raw_magnific_title, max_chars=200, forbidden_words=forbidden_w)
+        magnific_title = sanitize_title(raw_magnific_title or raw_title, max_chars=100, forbidden_words=forbidden_w) if has_magnific else ""
+
     result = {
-        "title": sanitize_title(raw_title, max_chars=200, forbidden_words=forbidden_w),
+        "title": std_title,
+        "magnific_title": magnific_title,
         "keywords": sanitize_keywords(raw_keywords, max_count=kw_count, mandatory_keywords=mandatory_kw, forbidden_words=forbidden_w),
         "ss_category1": ai_data.get("ss_category1", ""),
         "ss_category2": ai_data.get("ss_category2", ""),
@@ -295,7 +307,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
             "platforms": list(active_platforms),
             "keyword_count": keyword_count,
             "rules": dict(active_rules),
-            "title": "", "keywords": "",
+            "title": "", "magnific_title": "", "keywords": "",
             "ss_category1": "", "ss_category2": "",
             "as_category1": "0", "as_category2": "0",
             "editorial": "no", "mature_content": "no",
@@ -329,6 +341,7 @@ async def queue_jobs():
             "status": job.get("status","pending"),
             "media_url": f"/media/{job_id}" if get_job_filepath(job_id) else "",
             "title": job.get("title",""),
+            "magnific_title": job.get("magnific_title",""),
             "keywords": job.get("keywords",""),
             "ss_category1": job.get("ss_category1",""),
             "ss_category2": job.get("ss_category2",""),
@@ -387,7 +400,7 @@ async def queue_retry(payload: RetryPayload):
 async def update_job(job_id: str, data: dict):
     if job_id not in queue_manager.jobs:
         raise HTTPException(404, "Job not found")
-    allowed = {"title","keywords","ss_category1","ss_category2","as_category1","as_category2","editorial","mature_content","illustration","releases"}
+    allowed = {"title","magnific_title","keywords","ss_category1","ss_category2","as_category1","as_category2","editorial","mature_content","illustration","releases"}
     queue_manager.update_job(job_id, **{k:v for k,v in data.items() if k in allowed})
     return {"ok": True}
 

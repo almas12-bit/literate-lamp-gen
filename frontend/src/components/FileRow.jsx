@@ -39,6 +39,8 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
   const isError = job.status === 'error';
   const showSS = activePlatforms.includes('shutterstock');
   const showAS = activePlatforms.includes('adobe_stock');
+  const showMG = activePlatforms.includes('magnific');
+  const showStandardTitle = showSS || showAS;
 
   // Create stable video URL using useMemo to prevent re-creation on every render
   const videoUrl = useMemo(() => {
@@ -197,13 +199,33 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
         </div>
 
         {/* Title/Description */}
-        <div style={{ padding:'10px 10px 10px 0', borderLeft:'1px solid var(--bg-surface-3)' }}>
-          <p className="label-xs" style={{ marginBottom:5 }}>Title / Description</p>
-          <textarea value={job.title} onChange={e => patch('title', e.target.value)} rows={4} placeholder={isDone ? '' : 'Will be filled after analysis…'}
-            style={{ width:'100%', padding:'6px 8px', resize:'none', fontSize:12, lineHeight:1.5, background:'var(--bg-surface-2)' }}/>
-          <p style={{ fontSize:10, color: (job.title||'').length > 200 ? 'var(--error)' : 'var(--text-tertiary)', textAlign:'right', marginTop:3 }}>
-            {(job.title||'').length}/200
-          </p>
+        <div style={{ padding:'10px 10px 10px 0', borderLeft:'1px solid var(--bg-surface-3)', display:'flex', flexDirection:'column', gap:6 }}>
+          {showStandardTitle && (
+            <div>
+              <p className="label-xs" style={{ marginBottom:5 }}>
+                {showMG ? 'Title / Description (SS & AS)' : 'Title / Description'}
+              </p>
+              <textarea value={job.title} onChange={e => patch('title', e.target.value)} rows={showMG ? 2 : 4} placeholder={isDone ? '' : 'Will be filled after analysis…'}
+                style={{ width:'100%', padding:'6px 8px', resize:'none', fontSize:12, lineHeight:1.5, background:'var(--bg-surface-2)' }}/>
+              <p style={{ fontSize:10, color: (job.title||'').length > 200 ? 'var(--error)' : 'var(--text-tertiary)', textAlign:'right', marginTop:3 }}>
+                {(job.title||'').length}/200
+              </p>
+            </div>
+          )}
+          {showMG && (
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:5 }}>
+                <span style={{ fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:3, background:'#f3e8ff', color:'#7c3aed' }}>MG</span>
+                <p className="label-xs">Magnific Title</p>
+              </div>
+              <textarea value={job.magnific_title || ''} onChange={e => patch('magnific_title', e.target.value)} rows={showStandardTitle ? 2 : 4}
+                placeholder={job.title ? job.title.slice(0, 100) : (isDone ? '' : 'Will be filled after analysis…')}
+                style={{ width:'100%', padding:'6px 8px', resize:'none', fontSize:12, lineHeight:1.5, background:'var(--bg-surface-2)' }}/>
+              <p style={{ fontSize:10, color: (job.magnific_title||'').length > 100 ? 'var(--error)' : 'var(--text-tertiary)', textAlign:'right', marginTop:3 }}>
+                {(job.magnific_title||'').length}/100
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Keywords */}
@@ -257,8 +279,21 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
             </div>
           )}
 
+          {/* Magnific info (no categories required) */}
+          {showMG && !showSS && !showAS && (
+            <div>
+              <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:4 }}>
+                <span style={{ fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:3, background:'#f3e8ff', color:'#7c3aed' }}>MG</span>
+                <p className="label-xs">Magnific</p>
+              </div>
+              <p style={{ fontSize:11, color:'var(--text-tertiary)', lineHeight:1.4 }}>
+                CSV memakai Title (maks 100) & Keywords (maks 49). Tidak memerlukan kategori.
+              </p>
+            </div>
+          )}
+
           {/* Flags */}
-          <div style={{ borderTop:'1px solid var(--border)', paddingTop:7 }}>
+          <div style={{ borderTop: (showSS || showAS || showMG) ? '1px solid var(--border)' : 'none', paddingTop: (showSS || showAS || showMG) ? 7 : 0 }}>
             {[['editorial','Editorial'],['mature_content','Mature Content'],['illustration','Illustration']].map(([field, label]) => (
               <label key={field} style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer', marginBottom:5 }}>
                 <div className={`cb-box ${job[field]==='yes' ? 'checked' : ''}`} style={{ width:13, height:13 }}

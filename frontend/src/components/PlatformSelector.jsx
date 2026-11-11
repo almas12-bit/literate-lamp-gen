@@ -3,6 +3,7 @@ import { setPlatforms } from '../api';
 const PLATFORMS = [
   { id: 'shutterstock', label: 'Shutterstock', short: 'SS', color: '#1473e6', bg: '#e8f1fc' },
   { id: 'adobe_stock',  label: 'Adobe Stock',  short: 'AS', color: '#d7373f', bg: '#fde8e8' },
+  { id: 'magnific',     label: 'Magnific',     short: 'MG', color: '#7c3aed', bg: '#f3e8ff' },
 ];
 
 export default function PlatformSelector({ active, onChange }) {

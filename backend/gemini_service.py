@@ -178,7 +178,7 @@ def sanitize_title(title: str, max_chars: int = 200, forbidden_words: str = "") 
         return t
     truncated = t[:max_chars]
     last_space = truncated.rfind(" ")
-    if last_space > 50:
+    if last_space > min(50, int(max_chars * 0.4)):
         truncated = truncated[:last_space]
     return truncated.rstrip(",;:- ")
 
@@ -232,10 +232,19 @@ def build_prompt(media_label: str, platforms: List[str], keyword_count: int, man
     ss_cats = ", ".join(SS_CATEGORIES)
     as_cats = ", ".join([f"{k}={v}" for k, v in AS_CATEGORIES.items()])
 
-    fields = {
-        "title": "descriptive English title, strictly 100-180 characters, NEVER exceed 200 characters",
-        "keywords": f"exactly {target_kw} comma-separated English keywords ordered by relevance"
-    }
+    has_standard = ("shutterstock" in platforms) or ("adobe_stock" in platforms)
+    has_magnific = "magnific" in platforms
+    only_magnific = has_magnific and not has_standard
+
+    fields = {}
+    if only_magnific:
+        fields["magnific_title"] = "concise descriptive English title, strictly 60-95 characters, NEVER exceed 100 characters"
+    else:
+        fields["title"] = "descriptive English title, strictly 100-180 characters, NEVER exceed 200 characters"
+        if has_magnific:
+            fields["magnific_title"] = "concise descriptive English title summarizing the same scene, strictly 60-95 characters, NEVER exceed 100 characters"
+
+    fields["keywords"] = f"exactly {target_kw} comma-separated English keywords ordered by relevance"
 
     if "shutterstock" in platforms:
         fields["ss_category1"] = f"one from: {ss_cats}"
@@ -247,8 +256,18 @@ def build_prompt(media_label: str, platforms: List[str], keyword_count: int, man
 
     fields_str = json.dumps(fields, indent=2)
 
+    if only_magnific:
+        title_rule = "1. TITLE LENGTH (MAGNIFIC): 'magnific_title' MUST BE strictly UNDER 100 characters (aim for 70-95 characters). NEVER exceed 100 characters under any circumstance."
+    elif has_magnific:
+        title_rule = (
+            "1. TITLE LENGTH: 'title' (for Shutterstock/Adobe Stock) MUST BE strictly UNDER 200 characters (aim for 120-170 characters). "
+            "'magnific_title' (for Magnific) MUST BE a complete, concise version strictly UNDER 100 characters (aim for 70-95 characters). NEVER exceed those limits."
+        )
+    else:
+        title_rule = "1. TITLE LENGTH: The title MUST BE strictly UNDER 200 characters (aim for 120-170 characters). NEVER exceed 200 characters under any circumstance."
+
     rules = [
-        "1. TITLE LENGTH: The title MUST BE strictly UNDER 200 characters (aim for 120-170 characters). NEVER exceed 200 characters under any circumstance.",
+        title_rule,
         "2. TITLE CONTENT: Plain descriptive English sentence stating what is visible. DO NOT include camera gear/settings, and DO NOT include generic buzzwords like '4K', 'HD', 'masterpiece', 'trending', or 'wallpaper'.",
         f"3. KEYWORDS COUNT: Output EXACTLY {target_kw} keywords. NEVER exceed {target_kw} keywords and NEVER exceed 49 keywords.",
         "4. KEYWORDS RELEVANCE: Lowercase, comma-separated, ordered by relevance (most important first). NO duplicates.",

@@ -77,7 +77,9 @@ export default function App() {
         setFfmpegOk(h.data.ffmpeg);
         setGsOk(h.data.ghostscript);
         setCurrentModel(h.data.model || 'gemini-3.5-flash-lite');
-        setPlatforms(h.data.platforms || ['shutterstock']);
+        const initialPlatforms = h.data.platforms || ['shutterstock'];
+        setPlatforms(initialPlatforms);
+        setExportPlatforms(initialPlatforms);
         setKwCount(h.data.keyword_count || 45);
         if (h.data.rules) setRulesState(h.data.rules);
       } catch { setBackendOk(false); }
@@ -155,12 +157,12 @@ export default function App() {
     const donJobs = jobs.filter(j => j.status === 'done');
     if (!donJobs.length) return;
 
-    const sanitizeTitleExport = (t) => {
-      let str = (t || '').trim();
-      if (str.length > 200) {
-        str = str.substring(0, 200);
+    const sanitizeTitleExport = (t, maxChars = 200) => {
+      let str = String(t || '').replace(/\s+/g, ' ').trim();
+      if (str.length > maxChars) {
+        str = str.substring(0, maxChars);
         const lastSpace = str.lastIndexOf(' ');
-        if (lastSpace > 50) str = str.substring(0, lastSpace);
+        if (lastSpace > Math.min(50, Math.floor(maxChars * 0.4))) str = str.substring(0, lastSpace);
         str = str.replace(/[,;:\-\s]+$/, '');
       }
       return str;
@@ -172,30 +174,39 @@ export default function App() {
       return list.slice(0, 49).join(', ');
     };
 
+    const esc = s => `"${String(s || '').replace(/\r?\n/g, ' ').replace(/"/g, '""')}"`;
+
     let csv = '';
     if (platform === 'shutterstock') {
       const headers = ['Filename','Description','Keywords','Categories','Editorial','Mature content','illustration'];
-      const esc = s => `"${(s||'').replace(/"/g,'""')}"`;
       const rows = donJobs.map(j => {
         const cats = [j.ss_category1, j.ss_category2].filter(Boolean).join(', ');
-        return [j.filename, esc(sanitizeTitleExport(j.title)), esc(sanitizeKeywordsExport(j.keywords)), esc(cats), j.editorial, j.mature_content, j.illustration].join(',');
+        return [j.filename, esc(sanitizeTitleExport(j.title, 200)), esc(sanitizeKeywordsExport(j.keywords)), esc(cats), j.editorial, j.mature_content, j.illustration].join(',');
       });
       csv = [headers.join(','), ...rows].join('\n');
       download(csv, 'shutterstock_metadata.csv');
     } else if (platform === 'adobe_stock') {
       const headers = ['Filename','Title','Keywords','Category','Releases'];
-      const esc = s => `"${(s||'').replace(/"/g,'""')}"`;
       const rows = donJobs.map(j => {
         const cat = j.as_category1 && j.as_category1 !== '0' ? j.as_category1 : '';
-        return [j.filename, esc(sanitizeTitleExport(j.title)), esc(sanitizeKeywordsExport(j.keywords)), cat, esc(j.releases||'')].join(',');
+        return [j.filename, esc(sanitizeTitleExport(j.title, 200)), esc(sanitizeKeywordsExport(j.keywords)), cat, esc(j.releases||'')].join(',');
       });
       csv = [headers.join(','), ...rows].join('\n');
       download(csv, 'adobe_stock_metadata.csv');
+    } else if (platform === 'magnific') {
+      const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
+      const rows = donJobs.map(j => {
+        const mgTitle = sanitizeTitleExport(j.magnific_title || j.title, 100);
+        const kws = sanitizeKeywordsExport(j.keywords);
+        return [esc(j.filename), esc(mgTitle), esc(kws), esc(''), esc('')].join(';');
+      });
+      csv = [headers.join(';'), ...rows].join('\n');
+      download(csv, 'magnific_metadata.csv');
     }
   };
 
   const download = (content, filename) => {
-    const blob = new Blob([content], { type:'text/csv' });
+    const blob = new Blob([content], { type:'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
@@ -265,6 +276,7 @@ export default function App() {
               {[
                 { id:'shutterstock', label:'Shutterstock', file:'shutterstock_metadata.csv' },
                 { id:'adobe_stock',  label:'Adobe Stock',  file:'adobe_stock_metadata.csv'  },
+                { id:'magnific',     label:'Magnific',     file:'magnific_metadata.csv'     },
               ].map(p => (
                 <div key={p.id}
                   onClick={() => toggleExportPlatform(p.id)}
@@ -310,10 +322,10 @@ export default function App() {
         )}
 
         {/* Config panel — 4 columns */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 160px 140px', gap:10 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 185px 135px', gap:10 }}>
           <ApiKeyManager keysInfo={keysInfo} onKeysUpdated={poll} />
           <ModelSelector models={models} currentModel={currentModel} onModelChange={setCurrentModel} />
-          <PlatformSelector active={platforms} onChange={setPlatforms} />
+          <PlatformSelector active={platforms} onChange={(next) => { setPlatforms(next); setExportPlatforms(next); }} />
           <KeywordCount value={kwCount} onChange={setKwCount} />
         </div>
 
