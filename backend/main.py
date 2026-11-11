@@ -3,7 +3,7 @@ import logging
 import uuid
 import os
 import glob
-from typing import List, Optional
+from typing import Dict, List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,29 +23,64 @@ app.add_middleware(CORSMiddleware,
     allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+PREVIEW_DIR = os.path.join(UPLOAD_DIR, "previews")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(PREVIEW_DIR, exist_ok=True)
+_vector_preview_locks: Dict[str, asyncio.Lock] = {}
 
 def get_job_filepath(job_id: str) -> Optional[str]:
     matches = glob.glob(os.path.join(UPLOAD_DIR, f"{job_id}_*"))
     return matches[0] if matches else None
 
+def get_vector_preview_path(job_id: str) -> str:
+    return os.path.join(PREVIEW_DIR, f"{job_id}.png")
+
+async def ensure_vector_preview(job_id: str, job: dict, filepath: Optional[str] = None) -> Optional[str]:
+    """Return path to cached PNG preview for a vector job, converting once via Ghostscript if needed."""
+    preview_path = get_vector_preview_path(job_id)
+    if os.path.exists(preview_path):
+        return preview_path
+
+    lock = _vector_preview_locks.setdefault(job_id, asyncio.Lock())
+    async with lock:
+        if os.path.exists(preview_path):
+            return preview_path
+        src_path = filepath or job.get("local_file") or get_job_filepath(job_id)
+        if not src_path or not os.path.exists(src_path):
+            return None
+        with open(src_path, "rb") as f:
+            file_bytes = f.read()
+        file_ext = os.path.splitext(job.get("filename") or src_path)[1].lower() or ".eps"
+        png_bytes = await convert_vector_to_png(file_bytes, ext=file_ext)
+        if not png_bytes:
+            return None
+        os.makedirs(PREVIEW_DIR, exist_ok=True)
+        tmp_path = f"{preview_path}.tmp"
+        with open(tmp_path, "wb") as f:
+            f.write(png_bytes)
+        os.replace(tmp_path, preview_path)
+        return preview_path
+
 def remove_job_file(job_id: str):
-    filepath = get_job_filepath(job_id)
-    if filepath and os.path.exists(filepath):
-        try:
-            os.remove(filepath)
-        except Exception as e:
-            logger.warning(f"Failed to remove file {filepath}: {e}")
+    _vector_preview_locks.pop(job_id, None)
+    for target in (get_job_filepath(job_id), get_vector_preview_path(job_id)):
+        if target and os.path.exists(target):
+            try:
+                os.remove(target)
+            except Exception as e:
+                logger.warning(f"Failed to remove file {target}: {e}")
 
 def clear_upload_dir():
-    if os.path.exists(UPLOAD_DIR):
-        for fname in os.listdir(UPLOAD_DIR):
-            fpath = os.path.join(UPLOAD_DIR, fname)
-            try:
-                if os.path.isfile(fpath):
-                    os.remove(fpath)
-            except Exception:
-                pass
+    _vector_preview_locks.clear()
+    for folder in (UPLOAD_DIR, PREVIEW_DIR):
+        if os.path.exists(folder):
+            for fname in os.listdir(folder):
+                fpath = os.path.join(folder, fname)
+                try:
+                    if os.path.isfile(fpath):
+                        os.remove(fpath)
+                except Exception:
+                    pass
 
 ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
 
@@ -141,14 +176,15 @@ async def process_job(job_id: str, job: dict) -> dict:
             raise Exception("Failed to extract video frames. Is ffmpeg installed?")
         ai_data = await analyze_video_frames(model, frames, platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
     elif media_type == "vector":
-        file_ext = os.path.splitext(job.get("filename", ".eps"))[1].lower() or ".eps"
-        png_bytes = await convert_vector_to_png(file_bytes, ext=file_ext)
-        if not png_bytes:
+        preview_path = await ensure_vector_preview(job_id, job, file_path)
+        if not preview_path or not os.path.exists(preview_path):
             raise Exception(
                 "Failed to convert vector file to image. "
                 "Please install Ghostscript from https://ghostscript.com/releases/gsdnld.html "
                 "and ensure it is added to your system PATH."
             )
+        with open(preview_path, "rb") as f:
+            png_bytes = f.read()
         ai_data = await analyze_image(model, png_bytes, "image/png", platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
     else:
         ai_data = await analyze_image(model, file_bytes, mime_type, platforms, kw_count, mandatory_kw, forbidden_w, custom_inst)
@@ -322,6 +358,11 @@ async def get_media(job_id: str):
     if not filepath or not os.path.exists(filepath):
         raise HTTPException(404, "Media file not found")
     job = queue_manager.jobs.get(job_id, {})
+    if job.get("media_type") == "vector" or filepath.lower().endswith((".ai", ".eps")):
+        preview_path = await ensure_vector_preview(job_id, job, filepath)
+        if not preview_path or not os.path.exists(preview_path):
+            raise HTTPException(422, "Vector preview unavailable")
+        return FileResponse(preview_path, media_type="image/png")
     mime_type = job.get("mime_type")
     return FileResponse(filepath, media_type=mime_type, filename=job.get("filename"))
 

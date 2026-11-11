@@ -31,6 +31,7 @@ const STATUS_CFG = {
 export default function FileRow({ job, index, selected, onSelect, onDelete, onChange, activePlatforms }) {
   const videoRef = useRef(null);
   const [playing, setPlaying] = useState(false);
+  const [vectorPreviewFailed, setVectorPreviewFailed] = useState(false);
   const cfg = STATUS_CFG[job.status] || STATUS_CFG.pending;
   const kwCount = job.keywords ? job.keywords.split(',').filter(k => k.trim()).length : 0;
   const isVideo = job.media_type === 'video';
@@ -66,6 +67,10 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
       if (imageUrl) URL.revokeObjectURL(imageUrl);
     };
   }, [videoUrl, imageUrl]);
+
+  useEffect(() => {
+    setVectorPreviewFailed(false);
+  }, [job.id, job.media_url]);
 
   const patch = async (field, value) => {
     onChange(job.id, field, value);
@@ -185,13 +190,33 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
                   <div title="Preview tidak tersedia" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🎬</div>
                 )}
               </>
+            ) : effectiveImageUrl && !(isVector && vectorPreviewFailed) ? (
+              <>
+                <img
+                  src={effectiveImageUrl}
+                  alt={job.filename || ''}
+                  onError={() => { if (isVector) setVectorPreviewFailed(true); }}
+                  style={{
+                    width:'100%', height:'100%',
+                    objectFit: isVector ? 'contain' : 'cover',
+                    background: isVector ? '#ffffff' : undefined
+                  }}
+                />
+                {isVector && (
+                  <span style={{
+                    position:'absolute', right:2, bottom:2,
+                    fontSize:8, fontWeight:700, padding:'1px 4px', borderRadius:3,
+                    background:'rgba(20,120,80,0.88)', color:'#ffffff', letterSpacing:'0.04em'
+                  }}>
+                    {(job.filename || '').split('.').pop().toUpperCase()}
+                  </span>
+                )}
+              </>
             ) : isVector ? (
               <div title="Vector file (.ai/.eps)" style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2 }}>
                 <span style={{ fontSize:18 }}>🖊️</span>
                 <span style={{ fontSize:8, fontWeight:700, color:'#147850', letterSpacing:'0.05em' }}>{(job.filename || '').split('.').pop().toUpperCase()}</span>
               </div>
-            ) : effectiveImageUrl ? (
-              <img src={effectiveImageUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
             ) : (
               <div title="Preview tidak tersedia" style={{ width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🖼️</div>
             )}

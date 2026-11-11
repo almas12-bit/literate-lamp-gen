@@ -91,36 +91,54 @@ def convert_vector_to_png_sync(file_data: bytes, ext: str = ".eps") -> Optional[
         )
         return None
 
+    ext_norm = ext.lower() if ext.startswith(".") else f".{ext.lower()}"
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        input_path = os.path.join(tmpdir, f"input{ext}")
+        input_path = os.path.join(tmpdir, f"input{ext_norm}")
         output_path = os.path.join(tmpdir, "output.png")
 
         with open(input_path, "wb") as f:
             f.write(file_data)
 
-        cmd = [
-            gs,
-            "-dNOPAUSE",
-            "-dBATCH",
-            "-dSAFER",
-            "-sDEVICE=png16m",
-            "-r150",                    # 150 DPI — good quality, reasonable size
-            "-dFirstPage=1",
-            "-dLastPage=1",             # First page only
-            f"-sOutputFile={output_path}",
-            input_path,
-        ]
+        crop_flag = "-dEPSCrop" if ext_norm == ".eps" else ("-dUseCropBox" if ext_norm == ".ai" else None)
+
+        def _build_cmd(use_crop: bool):
+            cmd = [
+                gs,
+                "-dNOPAUSE",
+                "-dBATCH",
+                "-dSAFER",
+            ]
+            if use_crop and crop_flag:
+                cmd.append(crop_flag)
+            cmd.extend([
+                "-sDEVICE=png16m",
+                "-r150",                    # 150 DPI — good quality, reasonable size
+                "-dFirstPage=1",
+                "-dLastPage=1",             # First page only
+                f"-sOutputFile={output_path}",
+                input_path,
+            ])
+            return cmd
 
         try:
-            result = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=60
-            )
-            if result.returncode != 0:
-                stderr_msg = result.stderr.decode(errors="replace")[:400]
-                logger.error(f"Ghostscript failed (exit {result.returncode}): {stderr_msg}")
+            attempts = [True, False] if crop_flag else [False]
+            result = None
+            for use_crop in attempts:
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                result = subprocess.run(
+                    _build_cmd(use_crop),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=60
+                )
+                if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    break
+
+            if result is None or result.returncode != 0:
+                stderr_msg = result.stderr.decode(errors="replace")[:400] if result else ""
+                logger.error(f"Ghostscript failed (exit {result.returncode if result else '?'}): {stderr_msg}")
                 return None
 
             if not os.path.exists(output_path):
