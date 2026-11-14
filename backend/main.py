@@ -347,7 +347,7 @@ async def upload_files(files: List[UploadFile] = File(...)):
             "ss_category1": "", "ss_category2": "",
             "as_category1": "0", "as_category2": "0",
             "editorial": "no", "mature_content": "no",
-            "illustration": "no", "releases": "",
+            "illustration": "no", "is_ai": "no", "releases": "",
         })
         job_ids.append(job_id)
     return {"job_ids": job_ids, "count": len(job_ids)}
@@ -391,6 +391,7 @@ async def queue_jobs():
             "editorial": job.get("editorial","no"),
             "mature_content": job.get("mature_content","no"),
             "illustration": job.get("illustration","no"),
+            "is_ai": job.get("is_ai","no"),
             "releases": job.get("releases",""),
             "error": job.get("error",""),
             "platforms": job.get("platforms", ["shutterstock"]),
@@ -441,7 +442,7 @@ async def queue_retry(payload: RetryPayload):
 async def update_job(job_id: str, data: dict):
     if job_id not in queue_manager.jobs:
         raise HTTPException(404, "Job not found")
-    allowed = {"title","magnific_title","keywords","ss_category1","ss_category2","as_category1","as_category2","editorial","mature_content","illustration","releases"}
+    allowed = {"title","magnific_title","keywords","ss_category1","ss_category2","as_category1","as_category2","editorial","mature_content","illustration","is_ai","releases"}
     queue_manager.update_job(job_id, **{k:v for k,v in data.items() if k in allowed})
     return {"ok": True}
 

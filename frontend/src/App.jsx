@@ -194,11 +194,14 @@ export default function App() {
       csv = [headers.join(','), ...rows].join('\n');
       download(csv, 'adobe_stock_metadata.csv');
     } else if (platform === 'magnific') {
-      const headers = ['File name', 'Title', 'Keywords', 'Prompt', 'Model'];
+      const headers = ['filename', 'title', 'tags', 'is_ai', 'ai_prompt', 'ai_model', 'people_count'];
+      const cleanField = (s) => String(s || '').replace(/;/g, ',').replace(/["\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
       const rows = donJobs.map(j => {
-        const mgTitle = sanitizeTitleExport(j.magnific_title || j.title, 100);
-        const kws = sanitizeKeywordsExport(j.keywords);
-        return [esc(j.filename), esc(mgTitle), esc(kws), esc(''), esc('')].join(';');
+        const fname = cleanField(j.filename);
+        const mgTitle = cleanField(sanitizeTitleExport(j.magnific_title || j.title, 100));
+        const rawKws = j.keywords ? j.keywords.split(',').map(k => k.trim()).filter(Boolean).slice(0, 49) : [];
+        const tags = rawKws.map(k => cleanField(k)).filter(Boolean).join(',');
+        return [fname, mgTitle, tags, '', '', '', ''].join(';');
       });
       csv = [headers.join(';'), ...rows].join('\n');
       download(csv, 'magnific_metadata.csv');
