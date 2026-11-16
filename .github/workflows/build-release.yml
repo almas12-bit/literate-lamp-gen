@@ -1,6 +1,6 @@
-name: Build & Release Standalone Executable
+name: "Build & Release Standalone Executable"
 
-on:
+"on":
   push:
     tags:
       - 'v*'
@@ -27,14 +27,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Build Frontend
         shell: pwsh
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
           cd ..
           if (-not (Test-Path "frontend/dist/index.html")) {
@@ -45,15 +43,12 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
 
       - name: Install Python Dependencies & PyInstaller
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pyinstaller
 
       - name: Download Portable FFmpeg & ffprobe
         shell: pwsh
@@ -61,19 +56,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path bin | Out-Null
           Write-Host "Downloading FFmpeg portable build..."
           $ffmpegUrl = "https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-essentials_build.zip"
-          Invoke-WebRequest -Uri $ffmpegUrl -OutFile "ffmpeg.zip"
+          curl.exe -L -s -o ffmpeg.zip $ffmpegUrl
           Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg_temp"
           Get-ChildItem -Path "ffmpeg_temp" -Filter "ffmpeg.exe" -Recurse | Copy-Item -Destination "bin\ffmpeg.exe"
           Get-ChildItem -Path "ffmpeg_temp" -Filter "ffprobe.exe" -Recurse | Copy-Item -Destination "bin\ffprobe.exe"
           Remove-Item -Recurse -Force "ffmpeg_temp", "ffmpeg.zip"
           Write-Host "FFmpeg portable downloaded successfully."
 
-      - name: Download Portable Ghostscript (GhostTrap / Artifex)
+      - name: Download Portable Ghostscript (Artifex)
         shell: pwsh
         run: |
           Write-Host "Downloading Ghostscript Windows binaries..."
           $gsUrl = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/gs10040w64.exe"
-          Invoke-WebRequest -Uri $gsUrl -OutFile "gs_setup.exe"
+          curl.exe -L -s -o gs_setup.exe $gsUrl
           # 7z is preinstalled on windows-latest runner
           & 7z x gs_setup.exe -ogs_temp -y | Out-Null
           if (Test-Path "gs_temp\bin") {
@@ -107,30 +102,31 @@ jobs:
               Copy-Item ".env" -Destination "$PACKAGE_DIR\.env.example"
           }
 
-          @"
-==============================================================
-  Literate Lamp - AI Stock Media Metadata Generator
-  Versi: $TAG (Windows 64-bit Standalone)
-==============================================================
-
-PANDUAN PENGGUNAAN:
-1. Ekstrak seluruh isi file ZIP ini ke dalam satu folder.
-2. Klik dua kali file 'LiterateLamp.exe' untuk menjalankan aplikasi.
-3. Browser Anda akan terbuka secara otomatis di:
-   http://localhost:8000
-4. Masukkan Google Gemini API Key Anda melalui menu pengaturan.
-5. Folder 'bin/' sudah berisi binari FFmpeg dan Ghostscript portabel,
-   sehingga Anda TIDAK PERLU menginstal aplikasi pihak ketiga apapun.
-
-CARA MEMATIKAN APLIKASI:
-Tutup jendela hitam konsol aplikasi atau tekan Ctrl+C pada jendela tersebut.
-==============================================================
-"@ | Out-File -Encoding utf8 "$PACKAGE_DIR\README.txt"
+          $readmeLines = @(
+              "==============================================================",
+              "  Literate Lamp - AI Stock Media Metadata Generator",
+              "  Versi: $TAG (Windows 64-bit Standalone)",
+              "==============================================================",
+              "",
+              "PANDUAN PENGGUNAAN:",
+              "1. Ekstrak seluruh isi file ZIP ini ke dalam satu folder.",
+              "2. Klik dua kali file 'LiterateLamp.exe' untuk menjalankan aplikasi.",
+              "3. Browser Anda akan terbuka secara otomatis di:",
+              "   http://localhost:8000",
+              "4. Masukkan Google Gemini API Key Anda melalui menu pengaturan.",
+              "5. Folder 'bin/' sudah berisi binari FFmpeg dan Ghostscript portabel,",
+              "   sehingga Anda TIDAK PERLU menginstal aplikasi pihak ketiga apapun.",
+              "",
+              "CARA MEMATIKAN APLIKASI:",
+              "Tutup jendela hitam konsol aplikasi atau tekan Ctrl+C pada jendela tersebut.",
+              "=============================================================="
+          )
+          $readmeLines | Out-File -Encoding utf8 "$PACKAGE_DIR\README.txt"
 
           Compress-Archive -Path "$PACKAGE_DIR" -DestinationPath "$PACKAGE_DIR.zip"
           Write-Host "Release archive created: $PACKAGE_DIR.zip"
-          echo "PACKAGE_ZIP=$PACKAGE_DIR.zip" >> $env:GITHUB_ENV
-          echo "RELEASE_TAG=$TAG" >> $env:GITHUB_ENV
+          "PACKAGE_ZIP=$PACKAGE_DIR.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "RELEASE_TAG=$TAG" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -144,4 +140,3 @@ Tutup jendela hitam konsol aplikasi atau tekan Ctrl+C pada jendela tersebut.
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
