@@ -2,14 +2,16 @@ name: "Build & Release Standalone Executable"
 
 "on":
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Tag Versi Rilis (misal: v2.0.0)'
+        description: 'Tag Versi Rilis'
         required: false
-        default: 'manual-build'
+        default: 'v2.0.0'
 
 permissions:
   contents: write
@@ -92,7 +94,13 @@ jobs:
       - name: Assemble Release Package
         shell: pwsh
         run: |
-          $TAG = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { if ($env:INPUT_RELEASE_TAG) { $env:INPUT_RELEASE_TAG } else { 'latest' } }
+          $TAG = if ($env:GITHUB_REF_TYPE -eq 'tag') {
+              $env:GITHUB_REF_NAME
+          } elseif ($env:INPUT_RELEASE_TAG) {
+              $env:INPUT_RELEASE_TAG
+          } else {
+              'v2.0.0'
+          }
           $PACKAGE_DIR = "LiterateLamp-$TAG-Windows-x64"
           New-Item -ItemType Directory -Force -Path $PACKAGE_DIR | Out-Null
           Copy-Item "dist\LiterateLamp.exe" -Destination "$PACKAGE_DIR\"
@@ -102,27 +110,6 @@ jobs:
               Copy-Item ".env" -Destination "$PACKAGE_DIR\.env.example"
           }
 
-          $readmeLines = @(
-              "==============================================================",
-              "  Literate Lamp - AI Stock Media Metadata Generator",
-              "  Versi: $TAG (Windows 64-bit Standalone)",
-              "==============================================================",
-              "",
-              "PANDUAN PENGGUNAAN:",
-              "1. Ekstrak seluruh isi file ZIP ini ke dalam satu folder.",
-              "2. Klik dua kali file 'LiterateLamp.exe' untuk menjalankan aplikasi.",
-              "3. Browser Anda akan terbuka secara otomatis di:",
-              "   http://localhost:8000",
-              "4. Masukkan Google Gemini API Key Anda melalui menu pengaturan.",
-              "5. Folder 'bin/' sudah berisi binari FFmpeg dan Ghostscript portabel,",
-              "   sehingga Anda TIDAK PERLU menginstal aplikasi pihak ketiga apapun.",
-              "",
-              "CARA MEMATIKAN APLIKASI:",
-              "Tutup jendela hitam konsol aplikasi atau tekan Ctrl+C pada jendela tersebut.",
-              "=============================================================="
-          )
-          $readmeLines | Out-File -Encoding utf8 "$PACKAGE_DIR\README.txt"
-
           Compress-Archive -Path "$PACKAGE_DIR" -DestinationPath "$PACKAGE_DIR.zip"
           Write-Host "Release archive created: $PACKAGE_DIR.zip"
           "PACKAGE_ZIP=$PACKAGE_DIR.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -130,11 +117,12 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: Literate Lamp ${{ env.RELEASE_TAG }}
-          files: ${{ env.PACKAGE_ZIP }}
+          files: |
+            dist/LiterateLamp.exe
+            ${{ env.PACKAGE_ZIP }}
           draft: false
           prerelease: false
           generate_release_notes: true
