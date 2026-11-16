@@ -62,3 +62,6 @@ dist/
 build/
 uploads/
 backend/uploads/
+bin/
+*.zip
+LiterateLamp-*/

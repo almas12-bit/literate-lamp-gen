@@ -1,3 +1,23 @@
+import os
+import sys
+
+# Directory detection for frozen (PyInstaller executable) vs standard python execution
+if getattr(sys, "frozen", False):
+    # Running as compiled PyInstaller executable
+    APP_DIR = os.path.dirname(sys.executable)
+    BUNDLE_DIR = getattr(sys, "_MEIPASS", APP_DIR)
+else:
+    # Running in standard source / dev mode
+    APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    BUNDLE_DIR = APP_DIR
+
+# Portable binaries folder (e.g. ffmpeg, ghostscript)
+BIN_DIR = os.path.join(APP_DIR, "bin")
+
+# Prepend BIN_DIR to PATH if it exists so external tools can be invoked directly
+if os.path.isdir(BIN_DIR):
+    os.environ["PATH"] = BIN_DIR + os.pathsep + os.environ.get("PATH", "")
+
 GEMINI_MODELS = [
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",

@@ -2,14 +2,34 @@ import asyncio
 import subprocess
 import tempfile
 import os
+import shutil
 import logging
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
+from config import BIN_DIR
 
 logger = logging.getLogger(__name__)
 
 # Use thread pool for subprocess calls (Windows Python 3.14 compatibility)
 _executor = ThreadPoolExecutor(max_workers=4)
+
+
+def find_ffmpeg() -> str:
+    """Find ffmpeg binary: first in BIN_DIR, then in PATH."""
+    if os.path.isdir(BIN_DIR):
+        candidate = os.path.join(BIN_DIR, "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        if os.path.isfile(candidate):
+            return candidate
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+
+def find_ffprobe() -> str:
+    """Find ffprobe binary: first in BIN_DIR, then in PATH."""
+    if os.path.isdir(BIN_DIR):
+        candidate = os.path.join(BIN_DIR, "ffprobe.exe" if os.name == "nt" else "ffprobe")
+        if os.path.isfile(candidate):
+            return candidate
+    return shutil.which("ffprobe") or "ffprobe"
 
 
 def _run_cmd(cmd: list, timeout: int = 30) -> subprocess.CompletedProcess:
@@ -30,9 +50,10 @@ async def _run_cmd_async(cmd: list, timeout: int = 30) -> subprocess.CompletedPr
 
 def check_ffmpeg_sync() -> bool:
     """Check if ffmpeg is available."""
+    ffmpeg_bin = find_ffmpeg()
     try:
         result = subprocess.run(
-            ["ffmpeg", "-version"],
+            [ffmpeg_bin, "-version"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=10
@@ -49,10 +70,11 @@ async def check_ffmpeg() -> bool:
 
 def get_video_duration_sync(input_path: str) -> Optional[float]:
     """Get video duration using ffprobe synchronously."""
+    ffprobe_bin = find_ffprobe()
     try:
         result = subprocess.run(
             [
-                "ffprobe", "-v", "quiet",
+                ffprobe_bin, "-v", "quiet",
                 "-show_entries", "format=duration",
                 "-of", "csv=p=0",
                 input_path
@@ -71,6 +93,7 @@ def get_video_duration_sync(input_path: str) -> Optional[float]:
 
 def extract_frames_sync(video_data: bytes, frame_count: int = 3) -> List[bytes]:
     """Extract frames synchronously using ffmpeg."""
+    ffmpeg_bin = find_ffmpeg()
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, "input_video")
 
@@ -89,7 +112,7 @@ def extract_frames_sync(video_data: bytes, frame_count: int = 3) -> List[bytes]:
         for i, ts in enumerate(timestamps):
             frame_path = os.path.join(tmpdir, f"frame_{i:03d}.jpg")
             cmd = [
-                "ffmpeg", "-y",
+                ffmpeg_bin, "-y",
                 "-ss", str(ts),
                 "-i", input_path,
                 "-frames:v", "1",

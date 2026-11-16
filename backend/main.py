@@ -2,13 +2,19 @@ import asyncio
 import logging
 import uuid
 import os
+import sys
 import glob
 from typing import Dict, List, Optional
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from config import GEMINI_MODELS, VIDEO_FRAME_COUNT, DEFAULT_KEYWORD_COUNT, MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, AS_CATEGORIES
+from config import (
+    GEMINI_MODELS, VIDEO_FRAME_COUNT, DEFAULT_KEYWORD_COUNT,
+    MIN_KEYWORD_COUNT, MAX_KEYWORD_COUNT, AS_CATEGORIES,
+    APP_DIR, BUNDLE_DIR, BIN_DIR
+)
 from gemini_service import key_manager, analyze_image, analyze_video_frames, sanitize_title, sanitize_keywords
 from video_service import extract_frames, check_ffmpeg
 from vector_service import convert_vector_to_png, check_ghostscript
@@ -17,12 +23,27 @@ from queue_manager import queue_manager, JobStatus
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Shutterstock AI", version="2.0.0")
+class ApiPrefixMiddleware:
+    """Rewrite /api/... to /... so frontend requests work whether prefixed or not."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"].startswith("/api/"):
+            scope["path"] = scope["path"][4:]
+        await self.app(scope, receive, send)
+
+app = FastAPI(title="Literate Lamp", version="2.0.0")
+app.add_middleware(ApiPrefixMiddleware)
 app.add_middleware(CORSMiddleware,
-    allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+if getattr(sys, "frozen", False):
+    UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
+else:
+    UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+
 PREVIEW_DIR = os.path.join(UPLOAD_DIR, "previews")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(PREVIEW_DIR, exist_ok=True)
@@ -82,7 +103,7 @@ def clear_upload_dir():
                 except Exception:
                     pass
 
-ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+ENV_FILE = os.path.join(APP_DIR, ".env")
 
 def load_keys_from_env():
     if os.path.exists(ENV_FILE):
@@ -464,3 +485,36 @@ async def delete_jobs(ids: List[str]):
         if job_id in queue_manager.queue:
             queue_manager.queue.remove(job_id)
     return {"ok": True, "deleted": len(ids)}
+
+# -------------------------------------------------------------
+# Frontend Static Files Serving & SPA Fallback
+# -------------------------------------------------------------
+if getattr(sys, "frozen", False):
+    FRONTEND_DIST = os.path.join(BUNDLE_DIR, "dist")
+else:
+    FRONTEND_DIST = os.path.join(APP_DIR, "frontend", "dist")
+
+if os.path.isdir(FRONTEND_DIST):
+    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/")
+    async def serve_index():
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        return {"message": "Frontend build not found. Run npm run build."}
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend_spa(full_path: str):
+        if full_path.startswith("api/") or full_path.startswith("media/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = os.path.join(FRONTEND_DIST, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.isfile(index_file):
+            return FileResponse(index_file)
+        raise HTTPException(status_code=404, detail="File not found")
+

@@ -104,11 +104,41 @@ When a key hits rate limit (429), the backend automatically:
 
 ---
 
-## Gemini API Keys
+---
 
-Get free keys at: https://aistudio.google.com/app/apikey
+## Standalone Executable (.exe) & GitHub Releases
 
-Free tier limits:
-- 2.5 Flash: 10 req/min, 500 req/day
-- 2.0 Flash: 15 req/min, 1500 req/day
-- 2.5 Flash Lite: 30 req/min (fastest for bulk)
+Aplikasi Literate Lamp dapat diunduh sebagai paket `.exe` mandiri tanpa perlu memasang Python, Node.js, FFmpeg, atau Ghostscript secara manual.
+
+### Cara Menggunakan Versi Release:
+1. Unduh file `LiterateLamp-vX.Y.Z-Windows-x64.zip` dari halaman [Releases di GitHub](https://github.com/almas12-bit/literate-lamp-gen/releases).
+2. Ekstrak seluruh isi file ZIP ke folder komputer Anda.
+3. Klik ganda **`LiterateLamp.exe`**.
+4. Browser akan otomatis terbuka di `http://localhost:8000`.
+
+### Cara Membuat Rilis Baru via GitHub Actions:
+Proses kompilasi dan pembuatan rilis diotomatisasi menggunakan GitHub Actions workflow (`.github/workflows/build-release.yml`).
+
+Setiap kali ada perubahan/versi baru, buat git tag dan push ke GitHub:
+```bash
+git add .
+git commit -m "feat: rilis pembaruan versi v2.0.0"
+git tag v2.0.0
+git push origin main --tags
+```
+GitHub Actions akan otomatis:
+1. Mem-build frontend React (`npm run build`).
+2. Mengunduh FFmpeg & Ghostscript portabel ke folder `bin/`.
+3. Meng-compile file `LiterateLamp.exe` menggunakan PyInstaller.
+4. Mengemas seluruh paket ke dalam file ZIP.
+5. Menerbitkan rilis resmi baru di tab **Releases** GitHub secara otomatis.
+
+*(Anda juga dapat memicu build rilis secara manual dari menu **Actions** -> **Build & Release Standalone Executable** -> **Run workflow** di web GitHub).*
+
+### Build Executable di Komputer Lokal:
+Jika ingin meng-compile file `.exe` sendiri di komputer lokal:
+```cmd
+build_exe.bat
+```
+File executable yang dihasilkan akan berada di folder `dist\LiterateLamp.exe`.
+

@@ -86,7 +86,7 @@ export default function FileRow({ job, index, selected, onSelect, onDelete, onCh
     try { await retryFailed([job.id]); onChange(job.id, 'status', 'pending'); onChange(job.id, 'error', ''); } catch {}
   };
 
-  const backendBase = 'http://localhost:8000';
+  const backendBase = typeof window !== 'undefined' && window.location.port === '5173' ? 'http://localhost:8000' : '';
   const effectiveVideoUrl = videoUrl || (isVideo && job.media_url ? `${backendBase}${job.media_url}` : null);
   const effectiveImageUrl = imageUrl || (!isVideo && job.media_url ? `${backendBase}${job.media_url}` : null);
 

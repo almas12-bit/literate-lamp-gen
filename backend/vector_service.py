@@ -7,6 +7,7 @@ import shutil
 import logging
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
+from config import BIN_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,17 @@ _GS_WIN_DIRS = [
 def find_ghostscript() -> Optional[str]:
     """
     Find Ghostscript executable.
-    1. Check PATH first (gsc, gswin64c, gswin32c, gs)
+    0. Check portable bin folder first (BIN_DIR)
+    1. Check PATH (gsc, gswin64c, gswin32c, gs)
     2. Fall back to scanning common Windows install directories (GhostTrap, gs)
     """
+    # 0. Check portable bin folder
+    if os.path.isdir(BIN_DIR):
+        for exe in ("gsc.exe", "gswin64c.exe", "gswin32c.exe", "gs.exe"):
+            candidate = os.path.join(BIN_DIR, exe)
+            if os.path.isfile(candidate):
+                return candidate
+
     # 1. Check PATH
     for name in _GS_CANDIDATES:
         path = shutil.which(name)
